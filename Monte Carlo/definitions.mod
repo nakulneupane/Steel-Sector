@@ -214,141 +214,65 @@ param maintenance_cost default 15;        # Maintenance cost per tCS
 param other_opex default 10;              # Other opex per tCS
 
 # OTHER PARAMETERS
-
-
-
-# Coking-coal availability ceiling (imported coke-making coal for BF; PCI and indigenous
-# thermal DRI coal are NOT capped). Default 1e12 = effectively no limit, so runs without a
-# coking scenario file behave as before; scarce/normal/abundant set via scenarios/ccoal_*.
-param ccoal_cap {T} default 1e12;
-
-# ============================================================================
-# CAPACITY-EXPANSION PARAMETERS  (branch: capex-opex-framework)
-# Overnight-capex + fixed/variable-opex framework; consumed by v_capacity.mod
-# and r_cost.mod. See modules/v_capacity.mod for the formulation notes.
-# ============================================================================
-
-# --- 2025 installed capacity per route (tonnes crude steel, on each route's
-#     OUTPUT var). mip-v3 scrap-blending recalibration: the old 33.5 Mt
-#     "scrap-EAF" fleet was really the IF secondary sector, which blends sponge
-#     iron + scrap -- it is FOLDED INTO Coal DRI-EAF/IF (70.6 + 33.5 = 104.1 Mt).
-#     Dedicated 100% Scrap-EAF is 0.75 Mt installed with zero 2025 production.
+param ccoal_cap {T} default 1e12;             #coking coal cap
 param cap0_bof   default 90.00e6;             # steel_bof
 param cap0_cdri  default 104.10e6;            # coaldri_output (coal-DRI + IF fleet)
 param cap0_ngdri default 12.90e6;             # ngdri_output   (crude steel)
 param cap0_h2dri default 0;                   # h2dri_output   (none in 2025)
 param cap0_scrap default 0.75e6;              # steel_scrap_eaf (dedicated 100% scrap-EAF)
 
-# --- Asset lifetimes (yr) = build lock-in horizon (from former u_lockin horizons).
+# Asset lifetimes (yr) 
 param life_bof   default 25;
 param life_cdri  default 20;
 param life_ngdri default 20;
 param life_h2dri default 25;
 param life_scrap default 15;
 
-# --- Common capacity-addition ceiling (max new build/yr, tonnes crude steel).
-# mip-v3: ONE absolute slab shared by all four major routes (BF-BOF, coal-DRI,
-# NG-DRI, scrap-EAF) -- the former tech-specific fractions of the 2025 fleet
-# (cap_add_frac_*) had no clear justification and produced inconsistent effective
-# limits across routes. 10 Mt/yr for now; a sensitivity-analysis axis later.
+# Capacity-addition ceiling
+# limits across routes. 10 Mt/yr for now
 # H2-DRI is not governed by this -- its build rate is set by the electrolyser
-# Gaussian envelope (v_capacity.mod). Sweep with `let cap_add_common := X;`.
 param cap_add_common default 10e6;
 
-# --- Minimum capacity utilisation (private-player discipline): production must be at
-# least util_min_X of installed capacity, i.e. the idle capacity-production gap is capped
-# at 1-util_min_X. The rationale is ECONOMIC first, technical second:
-#   - ECONOMIC: below a break-even utilisation, fixed costs (capital service + labour +
-#     maintenance, all charged on capacity via fixopex_cost) spread over too few tonnes,
-#     unit cost blows up, and a private operator runs at a loss -> they SHUT rather than
-#     limp along. The floor encodes that discrete "operate above break-even or exit"
-#     reality (the model already PRICES idling via fixed opex; the floor forbids the
-#     loss-making low-utilisation branch a real owner would never choose). The "exit"
-#     side is available to incumbents via faster legacy retirement; new builds are
-#     committed for their life (the sunk-capital irreversibility), so for them it reads
-#     "run above break-even or don't build it".
-#   - TECHNICAL: this reinforces the ranking. BF-BOF highest (blast furnace runs baseload,
-#     cannot be turned down without damage -> high break-even); scrap-EAF lowest
-#     (batch/modular, cheaply idled -> low break-even); DRI shafts in between.
-# Applied from 2026 on (the 2025 fleet is calibrated to observed shares and inherits real
-# low utilisation, e.g. BF-BOF ~64%, so first(T) exempt).
+# Capacity utilisation 
 param util_min_bof   default 0.85;
 param util_min_cdri  default 0.75;
 param util_min_ngdri default 0.70;
 param util_min_h2dri default 0.70;
 param util_min_scrap default 0.60;
-
-# --- Maximum capacity utilisation (mip-v3): 100% is not achievable in practice
-# -- annual maintenance shutdowns, raw-material supply shocks, unplanned
-# outages. One common ceiling for all routes: production <= util_max * installed
-# capacity, i.e. serving demand requires building ~1/0.95 of it in nameplate.
 param util_max default 0.95;
 
-# --- Fixed opex per unit CRUDE-STEEL capacity per year (labour + maintenance).
-#     Incurred on installed capacity whether or not it runs. Route-indexed so
-#     per-route values can be supplied later; defaults to the global figure.
+# Fixed opex per unit 
 param fopex_bof   default labor_cost + maintenance_cost;
 param fopex_cdri  default labor_cost + maintenance_cost;
 param fopex_ngdri default labor_cost + maintenance_cost;
 param fopex_h2dri default labor_cost + maintenance_cost;
 param fopex_scrap default labor_cost + maintenance_cost;
 
-# --- Capital recovery factor CRF(L) at the real discount rate.
+# Capital recovery factor CRF(L) at the real discount rate.
 param crf_bof   := real_discount_rate*(1+real_discount_rate)^life_bof  /((1+real_discount_rate)^life_bof  -1);
 param crf_cdri  := real_discount_rate*(1+real_discount_rate)^life_cdri /((1+real_discount_rate)^life_cdri -1);
 param crf_ngdri := real_discount_rate*(1+real_discount_rate)^life_ngdri/((1+real_discount_rate)^life_ngdri-1);
 param crf_h2dri := real_discount_rate*(1+real_discount_rate)^life_h2dri/((1+real_discount_rate)^life_h2dri-1);
 param crf_scrap := real_discount_rate*(1+real_discount_rate)^life_scrap/((1+real_discount_rate)^life_scrap-1);
 
-# --- Annualised capital charge per unit route output (bundled over the route's
-#     process chain; reuses the existing n*_capex levelized figures). mip-v3: all
-#     route outputs are plain crude steel, so the per-tCS capex figures apply
-#     directly (no basis conversion).
+# Annualised capital charge per unit route output
 param acapex_bof   := n0_capex + n1_capex + ng_capex_pell + n2_capex + n3_capex;          # $/tCS/yr
 param acapex_cdri  := n4_capex_coal + ng_capex_pell + n7_capex;                           # $/tCS/yr
 param acapex_ngdri := n5_capex_ng   + ng_capex_pell + n7_capex;                           # $/tCS/yr
 param acapex_h2dri {t in T} := n6_capex_h2[t] + ng_capex_pell + n7_capex;                 # $/tCS/yr
 param acapex_scrap := n8_capex;                                                           # $/tCS/yr
 
-# --- Overnight capex per unit capacity = annualised charge / CRF.
+# Overnight capex per unit capacity = annualised charge / CRF.
 param ocapex_bof   := acapex_bof   / crf_bof;
 param ocapex_cdri  := acapex_cdri  / crf_cdri;
 param ocapex_ngdri := acapex_ngdri / crf_ngdri;
 param ocapex_h2dri {t in T} := acapex_h2dri[t] / crf_h2dri;
 param ocapex_scrap := acapex_scrap / crf_scrap;
+param ocapex_scrapchain default 100;  #collection,  shredding, sorting, processing/prurification
+param ocapex_coalchain default 0;     # $/(t-coal/yr);  coal mines/transport; already included in fuel cost so remains zero for now
+param ocapex_ngchain   default 0;     # $/(t-NG/yr);  NG pipelines/terminals; if there has to be new mined built or something the model can be edited
 
-# Scrap supply-chain expansion capex (collection + high-end processing/purification
-# yards), overnight $/(t scrap/yr). ~$100/t-cap reflects shredding + sensor-sorting
-# + copper/tramp purification (furnace-ready scrap), not just collection. Charged on
-# growth in scrap-handling capacity above the 2025 baseline (v_capacity.mod). Operating
-# cost + the existing chain are already embedded in the delivered scrap price.
-# Plain data param -> sweep with `let ocapex_scrapchain := X;`.
-param ocapex_scrapchain default 100;
-
-# Fossil supply-network expansion capex (coal mines/transport; NG pipelines/terminals),
-# overnight $/(t-fuel/yr), charged on growth in supply capacity above the 2025 baseline
-# (v_capacity.mod). DEFAULT 0: these are MATURE networks whose capital is already
-# absorbed in the delivered commodity prices (coking/non-coking/PCI coal, NG $/MMBtu),
-# so by default they add no cost and the model is unchanged. Set > 0 to charge capex on
-# fossil supply GROWTH (e.g. to test new mine/pipeline build-out under demand expansion);
-# the framework is then symmetric with scrap and green-H2. Sweep with `let ocapex_* := X;`.
-param ocapex_coalchain default 0;     # $/(t-coal/yr)
-param ocapex_ngchain   default 0;     # $/(t-NG/yr)
-
-# (Fixed opex is the labour+maintenance figure declared above as fopex_*,
-#  charged on installed capacity in v_capacity.mod; no %-of-capex term.)
-
-# --- Mode-1 (linear) electrolyser-capacity ramp coefficient: the additive ceiling on
-#     cap_h2elec additions is ramp_frac * H2_cap per year (a fixed annual slab, NOT a
-#     compounding %). Reflects ~constant annual capital availability. Sweep token RAMPVAL.
-#     Typically 0.15. (Used only in mode 1; modes 0/2 set the ceiling value differently.)
-param ramp_frac default 0.15;
-
-# Ablation toggle for the sunk-capital effect:
-#   sunk=1 (default, real model): capex on BUILDS, fixed opex on CAPACITY -> capital
-#     committed once built; idling/stranding does not recover it.
-#   sunk=0 (counterfactual): capex + fixed opex charged on PRODUCTION (old LCOE style),
-#     so building-then-idling costs nothing -> the optimizer can switch tech freely.
+param ramp_frac default 0.15;  #Use only in mode 1
 param sunk default 1;
 
 # ============================================================================
