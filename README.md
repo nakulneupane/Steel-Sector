@@ -28,7 +28,7 @@ Capacity expansion is represented using two different mechanisms:
 
 - **Hydrogen technologies** are constrained separately through an electrolyser deployment model that captures manufacturing and supply-chain limitations. By default, hydrogen deployment follows a **Gaussian transition**, representing slow initial deployment, rapid scale-up, and gradual stabilization.
 
-- Note: Alternative linear and unconstrained deployment modes are also available for sensitivity analysis.
+Note: Alternative linear and unconstrained deployment modes are also available for sensitivity analysis.
 
 ---
 
