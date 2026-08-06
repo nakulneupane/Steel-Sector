@@ -16,6 +16,13 @@ All three parameters range from **0 to 1**:
 ## Capacity Expansion
 
 The model explicitly tracks installed capacity for each steelmaking route. New capacity requires capital investment, has a fixed operating cost, and remains available throughout its lifetime. Annual expansion is limited by technology-specific deployment constraints.
+Conventional steelmaking routes share a common annual expansion limit, while hydrogen deployment follows a dedicated ramping model based on electrolyser deployment.
+
+Three hydrogen deployment modes are available:
+
+- **Mode 0:** No deployment limit (counterfactual)
+- **Mode 1:** Constant annual expansion rate
+- **Mode 2:** Gaussian deployment curve (default)
 
 ## Capacity Utilization
 
@@ -46,16 +53,6 @@ These components include:
 - Transport and storage
 
 This framework allows technology learning and electricity prices to influence the total cost of carbon capture.
-
-## Capacity Expansion Limits
-
-Conventional steelmaking routes share a common annual expansion limit, while hydrogen deployment follows a dedicated ramping model based on electrolyser deployment.
-
-Three hydrogen deployment modes are available:
-
-- **Mode 0:** No deployment limit (counterfactual)
-- **Mode 1:** Constant annual expansion rate
-- **Mode 2:** Gaussian deployment curve (default)
 
 ## Sunk Capital
 The model can represent investments in two ways:
