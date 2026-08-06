@@ -9,10 +9,10 @@ The model uses three learning parameters to represent future technological progr
 
 - **`theta_ccs`** – Represents improvements in carbon capture technology. It controls how much CCS plant capital costs decrease over time. The final cost of carbon capture is calculated from capital cost, electricity, steam, solvent, and transport & storage costs, rather than being set directly.
 
-Both parameters range from **0 to 1**:
+All three parameters range from **0 to 1**:
 - **0** = Slow transition
 - **1** = Fast transition
-- 
+
 ## Capacity Expansion
 
 The model explicitly tracks installed capacity for each steelmaking route. New capacity requires capital investment, has a fixed operating cost, and remains available throughout its lifetime. Annual expansion is limited by technology-specific deployment constraints.
