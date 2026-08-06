@@ -135,27 +135,7 @@ param phi_max_ngdri default 0.40;    # max scrap share of NG DRI-EAF charge
 param phi_max_h2dri default 0.40;    # max scrap share of H2 DRI-EAF charge
 param blend_ramp    default 0.05;
 
-# ============================================================================
-#   theta_tech -- GLOBAL technology learning: electrolyser + renewable capex
-#     (and the H2 firming adder, which scales with the electrolyser path).
-#     Set on world markets, exogenous to India; drives GREEN-H2 COST ONLY
-#     (the H2 island is behind-the-meter, decoupled from tariff and EF).
-#   theta_grid -- INDIA power-system outcome: grid emission factor + industrial
-#     tariff. Partially caused by global RE costs but mediated by domestic
-#     policy/DISCOM politics; drives CCS opex, EAF/IF power cost, Scope 2, WHR
-#     credit. The tariff endpoints STRADDLE "no decline" (0.085 slow / 0.055
-#     fast): even fast-grid worlds do not assume aggressive tariff relief.
-# Both in [0,1], 0 = slow transition, 1 = fast. All 2025 anchors are FIXED, so
-# calibration ($5/kg H2, $125/t CCS, 0.07 $/kWh) never moves; thetas only
-# spread the 2050 endpoints. Correlation between the axes belongs in the
-# SAMPLER (e.g. rank-corr ~0.5 or a 2D grid), not welded into the model -- the
-# off-diagonal world (cheap global tech, dirty expensive grid: industry builds
-# RE islands BECAUSE the grid disappoints) must stay reachable.
-# CCS capital is on its own learning axis (CCSVAL anchors), untouched by either.
-# Sweep with `let theta_tech := X; let theta_grid := Y;`. Per-component
-# overrides: the slow/fast anchors are plain data params, and a scenario
-# `let n9_grid_ef_end := X;` still wins over the theta_grid default.
-# ============================================================================
+#Technology Learning
 param theta_tech default 0;              # global tech learning speed (H2 axis)
 param theta_grid default 0;              # India grid outcome speed (EF + tariff)
 param grid_price_start    default 0.07;    # 2025 grid tariff, $/kWh (fixed anchor)
@@ -163,24 +143,12 @@ param grid_price_end_slow default 0.085;   # 2050 grid tariff, slow (straddles f
 param grid_price_end_fast default 0.055;   # 2050 grid tariff, fast
 param grid_ef_end_slow    default 0.0006; # 2050 grid EF, slow (tCO2/kWh)
 param grid_ef_end_fast    default 0.0003; # 2050 grid EF, fast
-# H2-side endpoints calibrated so the EMERGENT 2050 LCOH spans the scenario
 # bands: theta_tech = 0 -> ~$3.7/kg (expensive band $3-4), theta_tech = 1 ->
 # ~$1.8/kg (cheap band $1-2). 2050 H2 cost is never specified directly.
 param h2elec_capex_end_slow default 550;   # 2050 electrolyser capex $/kW, slow
 param h2elec_capex_end_fast default 150;   # 2050 electrolyser capex $/kW, fast (DOE optimistic)
 param re_capex_end_slow   default 600;     # 2050 renewable capex $/kW, slow
 param re_capex_end_fast   default 200;     # 2050 renewable capex $/kW, fast (IRENA optimistic solar)
-
-# theta_ccs -- CAPTURE-PLANT LEARNING axis (independent of both thetas above;
-# CCS cost evolution is not a power-sector outcome). It sets how far the 2050
-# overnight capture capex falls below the 2025 calibrated value; the realized
-# 2050 CCS cost then EMERGES as capex(theta_ccs) + compression power
-# (theta_grid tariff) + regen steam + solvent + T&S -- never specified
-# directly. Emergent 2050 CAPTURE cost (ex-T&S, the literature convention):
-# theta_ccs = 0 -> ~$84/t (expensive band $60-100), theta_ccs = 1 -> ~$42/t
-# (cheap band $30-60); add ccs_ts_cost ($20) for the all-in.
-# (This RETIRES the old n10_ccs_cost_end 2050 all-in anchor -- kept declared
-#  only so legacy CCSVAL driver tokens do not error; it is no longer used.)
 param theta_ccs default 0;                 # capture-plant learning speed
 param ccs_capex_fall_slow default 0.30;    # 2050 overnight-capex decline vs 2025, slow
 param ccs_capex_fall_fast default 0.80;    # 2050 overnight-capex decline vs 2025, fast
