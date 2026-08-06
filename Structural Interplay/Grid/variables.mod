@@ -62,7 +62,7 @@ var pellets_fineore_h2dri{T}    >= 0;  # X[44]
 var pellets_power_h2dri{T}      >= 0;  # X[45]
 
 # Coal DRI
-var coaldri_output{t in T}      >= 0,  <= dem[t];  # X[46] (primary decision; route split; crude-steel basis, mip-v3)
+var coaldri_output{t in T}      >= 0,  <= dem[t];  # X[46] 
 var coaldri_dri_out{T}          >= 0;  # X[47] DRI (t) produced by the coal-DRI shaft
 var coaldri_scrap_in{T}         >= 0;  # X[48] scrap (t) blended into the coal route's EAF charge
 var coaldri_pellets_in{T}       >= 0;  # X[49]
@@ -71,7 +71,7 @@ var coaldri_power_in{T}         >= 0;  # X[51]
 var coaldri_lumpore_in{T}       >= 0;  # X[52]
 
 # NG DRI
-var ngdri_output{t in T}        >= 0,  <= dem[t];  # X[53] (primary decision; route split; crude-steel basis, mip-v3)
+var ngdri_output{t in T}        >= 0,  <= dem[t];  # X[53]
 var ngdri_dri_out{T}            >= 0;  # X[54] DRI (t) produced by the NG-DRI shaft
 var ngdri_scrap_in{T}           >= 0;  # X[55] scrap (t) blended into the NG route's EAF charge
 var ngdri_pellets_in{T}         >= 0;  # X[56]
