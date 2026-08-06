@@ -26,7 +26,9 @@ Capacity expansion is represented using two different mechanisms:
 
 - **Conventional technologies** (BF-BOF, Coal DRI, NG-DRI, and Scrap-EAF) share a common annual capacity addition limit (`cap_add_common`), representing realistic construction and industrial deployment constraints.
 
-- **Hydrogen technologies** are constrained separately through an electrolyser deployment model that captures manufacturing and supply-chain limitations. By default, hydrogen deployment follows a **Gaussian transition**, representing slow initial deployment, rapid scale-up, and gradual stabilization. Alternative linear and unconstrained deployment modes are also available for sensitivity analysis.
+- **Hydrogen technologies** are constrained separately through an electrolyser deployment model that captures manufacturing and supply-chain limitations. By default, hydrogen deployment follows a **Gaussian transition**, representing slow initial deployment, rapid scale-up, and gradual stabilization.
+
+- Note: Alternative linear and unconstrained deployment modes are also available for sensitivity analysis.
 
 ---
 
