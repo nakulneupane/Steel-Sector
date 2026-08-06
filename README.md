@@ -1,62 +1,72 @@
 # Model Framework
 
+## Technology Learning
 
-The model uses three learning parameters to represent future technological progress.
+Future technology development is represented using three independent learning parameters, each ranging from **0** (slow progress) to **1** (fast progress). All technologies are calibrated to fixed 2025 values, while only the future (2050) performance changes.
 
-- **`theta_tech`** – Represents global technology progress. It affects the cost of green hydrogen by reducing electrolyser and renewable energy costs. It does **not** affect electricity prices or grid emissions in India.
+- **`theta_tech`** controls global learning in green hydrogen technologies, including electrolyser and dedicated renewable costs.
+- **`theta_grid`** controls the evolution of the Indian power system, affecting grid electricity prices, grid emission factors, electric steelmaking, waste heat recovery, and CCS operating costs.
+- **`theta_ccs`** controls improvements in carbon capture technology by reducing CCS capital costs. The total capture cost is calculated from capital, electricity, steam, solvent, and transport & storage costs.
 
-- **`theta_grid`** – Represents the future Indian power system. It affects grid electricity prices, grid emission factor, CCS operating costs, EAF electricity costs, and waste heat recovery benefits.
+The three learning parameters are independent and can be combined to represent different future scenarios.
 
-- **`theta_ccs`** – Represents improvements in carbon capture technology. It controls how much CCS plant capital costs decrease over time. The final cost of carbon capture is calculated from capital cost, electricity, steam, solvent, and transport & storage costs, rather than being set directly.
-
-All three parameters range from **0 to 1**:
-- **0** = Slow transition
-- **1** = Fast transition
+---
 
 ## Capacity Expansion
 
-The model explicitly tracks installed capacity for each steelmaking route. New capacity requires capital investment, has a fixed operating cost, and remains available throughout its lifetime. Annual expansion is limited by technology-specific deployment constraints.
-Conventional steelmaking routes share a common annual expansion limit, while hydrogen deployment follows a dedicated ramping model based on electrolyser deployment.
+The model explicitly tracks installed capacity for every steelmaking route. Building new capacity requires capital investment, incurs fixed operating costs, and remains available throughout its lifetime.
 
-Three hydrogen deployment modes are available:
+Capacity expansion is represented using two different mechanisms:
 
-- **Mode 0:** No deployment limit (counterfactual)
-- **Mode 1:** Constant annual expansion rate
-- **Mode 2:** Gaussian deployment curve (default)
+- **Conventional technologies** (BF-BOF, Coal DRI, NG-DRI, and Scrap-EAF) share a common annual capacity addition limit (`cap_add_common`), representing realistic construction and industrial deployment constraints.
+
+- **Hydrogen technologies** are constrained separately through an electrolyser deployment model that captures manufacturing and supply-chain limitations. By default, hydrogen deployment follows a **Gaussian transition**, representing slow initial deployment, rapid scale-up, and gradual stabilization. Alternative linear and unconstrained deployment modes are also available for sensitivity analysis.
+
+---
 
 ## Capacity Utilization
 
-Production must operate within minimum and maximum utilization limits. The minimum utilization represents the economic requirement for plants to operate above break-even levels, while the maximum utilization accounts for maintenance and operational downtime.
+Each production route operates within minimum and maximum utilization limits.
+
+Minimum utilization represents the economic requirement for plants to operate above break-even levels, while maximum utilization accounts for maintenance shutdowns and operational limitations.
+
+---
 
 ## Green Hydrogen Supply
 
-Instead of using a fixed hydrogen price, the model explicitly represents the green hydrogen supply chain, including:
+Rather than prescribing a fixed hydrogen price, the model explicitly represents the complete green hydrogen supply chain.
+
+This includes:
 
 - Electrolyser capacity
-- Dedicated renewable electricity
+- Dedicated renewable generation
 - Hydrogen firming and storage
 - Operating costs
 
-This allows hydrogen investments to become sunk assets that can later be underutilized or stranded.
+Dedicated renewable electricity supplies hydrogen production independently of the grid, allowing hydrogen costs to evolve separately from electricity prices. Hydrogen investments are treated as physical assets that can later become underutilized or stranded.
+
+---
 
 ## Carbon Capture and Storage (CCS)
 
-CCS costs are built from individual components rather than using a single capture cost.
+CCS is modeled using a component-based cost framework rather than a fixed cost per tonne of CO₂ captured.
 
-These components include:
+The total capture cost is calculated from:
 
 - Capture plant capital cost
 - Fixed operating cost
-- Electricity for compression
+- Electricity for CO₂ compression
 - Steam for solvent regeneration
 - Solvent consumption
 - Transport and storage
 
-This framework allows technology learning and electricity prices to influence the total cost of carbon capture.
+The model also accounts for differences in CO₂ concentration between process streams. CO₂-rich streams require less energy to capture than dilute flue gases, allowing each steelmaking route to have different CCS costs and energy requirements.
+
+---
 
 ## Sunk Capital
-The model can represent investments in two ways:
 
-- **`sunk = 1` (default):** Capital costs are paid when new capacity is built and cannot be recovered later. This represents real-world investment decisions and allows stranded assets.
+The model supports two investment formulations:
 
-- **`sunk = 0`:** Capital and fixed operating costs are charged only on production. Capacity can be built, idled, or abandoned without financial penalty. This is a counterfactual setting used to isolate the effect of irreversible investments.
+- **`sunk = 1` (default):** Investments are irreversible. Capital costs are incurred when capacity is built, even if the asset is later underutilized or stranded.
+- **`sunk = 0`:** Capital and fixed operating costs are charged only on production. Capacity can be built and abandoned without financial penalty. This counterfactual setting isolates the effect of irreversible investments.
