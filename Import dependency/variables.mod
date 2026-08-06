@@ -1,7 +1,6 @@
 
 # Variables
 
-
 # Coke oven
 var coke_power_in{T}            >= 0;  # X[1]
 var coking_coal_in{T}           >= 0;  # X[2]
@@ -63,10 +62,6 @@ var pellets_power_ngdri{T}      >= 0;  # X[43]
 var pellets_fineore_h2dri{T}     >= 0;  # X[44]
 var pellets_power_h2dri{T}       >= 0;  # X[45]
 
-# mip-v3 SCRAP BLENDING (linear): the per-route blended-scrap FLOWS below are
-# the decisions; the blend share of each route's metallic charge is an outcome,
-# banded by [phi_min_X, phi_max_X] and smoothed by blend_ramp (see the route
-# modules). 2025 is pinned to the observed baseline blends phi0_*.
 
 # Coal DRI
 var coaldri_output{t in T}      >= 0,  <= dem[t];  # X[40] (primary decision; route split; crude-steel basis, mip-v3)
@@ -94,7 +89,8 @@ var h2dri_pellets_in{T}          >= 0;  # X[51]
 var h2dri_h2_in{T}              >= 0;  # X[52]
 var h2dri_power_in{T}           >= 0;  # X[53]
 var h2dri_lumpore_in{T}         >= 0;  # X[54]
-# EAF (DRI-based
+
+# EAF (DRI-based)
 var steel_eaf{T}                >= 0;  # X[55]
 var dri_eaf_steel_out{T}        >= 0;  # X[56]
 var eaf_scrap_in{T}             >= 0;  # X[57]
@@ -127,8 +123,6 @@ var wasteheat_eaf{T}            >= 0;  # X[75]
 var scrap_eaf_wasteheat{T}      >= 0;  # X[76]
 var whr_power_generated{T}      >= 0;  # X[77]
 var whr_available_gas{T}            >= 0;
-# mip-v3 CCS-steam competition: the accessible waste-heat pool is allocated
-# between power generation and CCS solvent-regeneration steam (o_waste_heat.mod)
 var whr_gas_to_power{T}         >= 0;  # pool GJ routed to WHR power
 var whr_gas_to_steam{T}         >= 0;  # pool GJ routed to CCS regen steam
 
@@ -171,23 +165,8 @@ var total_emissions{T}          >= 0;  # X[104]- Total CO2 emitted
 
 
 # Additional decision variables
-# Linearization: the capture fractions fc_bf/fc_cdri/fc_ngdri and the DRI route
-# fractions f_cdri/f_ngdri are NO LONGER optimization variables.
-#  - Capture: the captured CO2 amounts ccs_bf/ccs_cdri/ccs_ngdri are the decisions,
-#    bounded by the technical limit ccs_X <= n10_ccs_eta*fc_max*capbase_X (q_carbon_capture.mod).
-#  - DRI route: the route outputs coaldri_output/ngdri_output/h2dri_output are the
-#    decisions, linked linearly by dri_route_split (k_dri_h2.mod).
-# This removes every bilinear (capbase*fc) and (f_route*dri) product. The realized
-# fractions are recovered post-solve for reporting (yreport.mod).
-# Physical capturable CO2 per route (gross CO2 in the capture-amenable streams,
-# ~= route Scope-1). The infrastructure/logistics deployment ceiling (ccs_avail,
-# a growing fraction of this) is what actually limits captured CO2 -- see
-# q_carbon_capture.mod (ccs_sector_ceiling).
 var co2_capturable_bf{T}        >= 0;   # physical capturable CO2, BF-BOF route
 var co2_capturable_cdri{T}      >= 0;   # physical capturable CO2, Coal-DRI route
 var co2_capturable_ngdri{T}     >= 0;   # physical capturable CO2, NG-DRI route
 var f_bof{T}                    >= 0,   <= 1;   # BF-BOF fraction
 var f_eaf{T}                    >= 0,   <= 1;   # DRI-EAF fraction
-# dec_switch_* CCS phase-in binaries removed (see t_additional_constraints.mod):
-# anti-churn now via CCS sunk capex; dec_switch_bof/ceaf/ngeaf/h2eaf were already dead.
-
