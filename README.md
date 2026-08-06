@@ -12,6 +12,12 @@ The three learning parameters are independent and can be combined to represent d
 
 ---
 
+## Steel Demand
+
+Future steel demand is exogenously specified using an annual growth rate. The optimizer must satisfy demand in every year by selecting the least-cost combination of production routes.
+
+---
+
 ## Capacity Expansion
 
 The model explicitly tracks installed capacity for every steelmaking route. Building new capacity requires capital investment, incurs fixed operating costs, and remains available throughout its lifetime.
@@ -61,6 +67,30 @@ The total capture cost is calculated from:
 - Transport and storage
 
 The model also accounts for differences in CO₂ concentration between process streams. CO₂-rich streams require less energy to capture than dilute flue gases, allowing each steelmaking route to have different CCS costs and energy requirements.
+
+---
+
+## Waste Heat Recovery
+
+Waste heat generated throughout the steelmaking process can be recovered and used either to generate electricity or to supply regeneration steam for CCS. The model optimizes this allocation based on system economics.
+
+---
+
+## Scrap Blending
+
+Scrap can be utilized in three ways:
+
+- Blended into BF-BOF.
+- Blended into DRI-EAF routes.
+- Used directly in dedicated Scrap-EAF production.
+
+Each route has minimum and maximum allowable scrap fractions, and annual changes in blending are limited to represent gradual operational changes.
+
+---
+
+## Supply Chain Expansion
+
+The model can also invest in supporting infrastructure, including scrap processing facilities, hydrogen production assets, and optional fossil fuel supply networks, allowing supply-chain expansion costs to be included in transition planning.
 
 ---
 
