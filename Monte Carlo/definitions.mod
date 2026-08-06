@@ -2,8 +2,6 @@
 # Crude Steel Production
 param base_demand default 152200000;  # Steel production at year 2025
 param growth_rate default 0.05;
-# Fixed annual steel demand (total_steel is pinned to this by meet_demand).
-# Used to linearize the f_bof/f_eaf * total_steel products and to size route bounds.
 param dem{t in T} := base_demand * (1 + growth_rate)^(ord(t) - 1);
 
 # TECHNICAL PARAMETERS 
@@ -45,7 +43,6 @@ param n1_sintgas_sint default 1800;  # Sinter gas (Nm3) per ton sinter
 #Remaining sinter gas is waste with very low energy value
 #Biochar replacement is limited to 20%
 
-
 # Blast Furnace
 param n2_e_hm default 55;            # Electricity (kWh) per ton hot metal  
 param n2_sint_hm default 1.15;       # Sinter (ton) per thm                                              
@@ -62,18 +59,15 @@ param n2_biopci_hm_25 default 0;     # Biomass injection (ton) per thm in 2025
 param n2_coalpci_hm_50 default 0.16; # PCI (ton) per thm by 2050
 param n2_biopci_hm_50 default 0.053; # Biomass injection (ton) per thm by 2050
 param n2_coke_hm_25 default 0.53;    # Coke (ton) per thm in 2025 
-param n2_coke_hm_50 default 0.48;    # Coke (ton) per thm by 2050 (+0.04 vs 0.44: makes up the removed BF H2 co-injection, ~3 t coke / t H2 reduction-equivalent)
+param n2_coke_hm_50 default 0.48;    # Coke (ton) per thm by 2050 
 param n2_h2_hm_25 default 0;         # Hydrogen in blast furnace in 2025 (t/thm)
-param n2_h2_hm_50 default 0;         # Hydrogen in blast furnace by 2050 (t/thm) -- BF H2 co-injection removed; H2-DRI is the only H2 consumer
+param n2_h2_hm_50 default 0;         # Hydrogen in blast furnace by 2050 (t/thm) 
 #Biochar replacement is limited to 20%
 #Remaining BFG goes to power plant              
-
 
 # BOF
 param n3_e_bof default 174;         # Electricity (kWh) per ton crude steel from BOF
 param n3_metallic_bof default 1.1;  # Total metallic charge (hot metal + scrap, ton) per tCS in BOF
-# (BOF scrap is a banded flow decision -- see the SCRAP BLENDING block below;
-#  the old fixed n3_s_bof charge is gone.)
 param n3_ls_bof default 0.075;      # Limestone (ton) per tCS in BOF
 param n3_sl_bof default 0.1;        # Slag (ton) per tCS in BOF
 param n3_bofg_bof default 100;      # BOFG gas (Nm3) formed per tCS in BOF
@@ -95,7 +89,6 @@ param n5_pel_dri default 1.5;       # Pellets (tons) per ton DRI
 param n5_ore_dri default 0.1;       # Ore (tons) per ton DRI 
 param n5_ng_dri default 0.35;       # Natural gas (tons) per ton DRI      
 
-
 #H2 DRI
 param n6_e_dri default 110;         # Electricity (kWh) per ton DRI 
 param n6_pel_dri default 1.5;       # Pellets (tons) per ton DRI 
@@ -112,7 +105,6 @@ param n7_cs default 0.01;                  # Coal (ton) per tCS
 param n7_ss default 0.15;                  # Slag (ton) per tCS   
 param n7_eafg default 3;                   # EAF Gas (GJ) per tCS                           
  
-
 # EAF (Scrap-Based)
 param n8_e_eaf {t in T} :=
     785; # Electricity (kWh) per tCS: scrap secondary, 75% IF @825 + 25% EAF @664 weighted (India IF-heavy secondary route)
@@ -123,44 +115,27 @@ param n8_cs default 0.01;                # Coal (ton) per tCS
 param n8_ss default 0.15;                # Slag (ton) per tCS 
 param n8_eafg default 3;                 # EAF Gas (GJ) per tCS                          
    
-
-# ============================================================================
-# SCRAP BLENDING (mip-v3, LINEAR). Scrap can be used three ways:
+# Scrap can be used three ways:
 #   1. blended into the BF-BOF metallic charge (displacing hot metal 1:1),
 #   2. blended into the DRI-EAF metallic charge (coal / NG / H2 sub-routes,
 #      displacing DRI 1:1),
 #   3. as 100% scrap-based steel via the dedicated Scrap-EAF route (1.1 t/tCS).
-# The per-route blended-scrap FLOW is the decision each year (X_scrap_in vars);
-# the blend share of the route's METALLIC CHARGE (n3_metallic_bof / n7_dri_ratio
-# = 1.1 t per tCS) is an OUTCOME, kept within a metallurgical BAND
-# [phi_min_X, phi_max_X] and smoothed by a flow RAMP (blend practice cannot
-# change faster than blend_ramp of the charge per year). All constraints are
-# linear -- flow bounds proportional to output, no fraction variables. 2025 is
-# pinned to the observed baseline blends phi0_*. The shared availability pool
-# (scrap_bound) allocates scrap across all uses from 2026 on.
-# ============================================================================
+# There is a limit set for blends
+
 param phi0_bof      default 0.09;    # 2025 baseline scrap share of BOF metallic charge
 param phi0_cdri     default 0.382;   # 2025 baseline scrap share, Coal DRI-EAF/IF charge
 param phi0_ngdri    default 0.13;    # 2025 baseline scrap share, NG DRI-EAF charge
-param phi_min_bof   default 0.05;    # min scrap share of BF-BOF charge (converter coolant)
-param phi_min_cdri  default 0;       # min scrap share, Coal DRI-EAF (none required)
+param phi_min_bof   default 0.05;    # min scrap share of BF-BOF charge 
+param phi_min_cdri  default 0;       # min scrap share, Coal DRI-EAF 
 param phi_min_ngdri default 0;       # min scrap share, NG DRI-EAF
 param phi_min_h2dri default 0;       # min scrap share, H2 DRI-EAF
 param phi_max_bof   default 0.20;    # max scrap share of BF-BOF metallic charge
 param phi_max_cdri  default 0.40;    # max scrap share of Coal DRI-EAF charge
 param phi_max_ngdri default 0.40;    # max scrap share of NG DRI-EAF charge
 param phi_max_h2dri default 0.40;    # max scrap share of H2 DRI-EAF charge
-# Blend-practice ramp: year-on-year change in a route's blended-scrap flow is
-# capped at blend_ramp x (this year's metallic charge), i.e. the blend share can
-# move at most ~5 pp/yr (plus output-growth headroom). Applies to the incumbent
-# BOF/coal/NG practices; H2-DRI is a new route (no incumbent practice) and is
-# exempt. Sweep with `let blend_ramp := X;`.
 param blend_ramp    default 0.05;
 
 # ============================================================================
-# POWER-TRANSITION SCENARIO (mip-v3): TWO axes, tech vs grid.
-# The former single theta_power conflated two different kinds of uncertainty;
-# it is split into:
 #   theta_tech -- GLOBAL technology learning: electrolyser + renewable capex
 #     (and the H2 firming adder, which scales with the electrolyser path).
 #     Set on world markets, exogenous to India; drives GREEN-H2 COST ONLY
