@@ -2,8 +2,6 @@
 # Crude Steel Production
 param base_demand default 152200000;  # Steel production at year 2025
 param growth_rate default 0.05;
-# Fixed annual steel demand (total_steel is pinned to this by meet_demand).
-# Used to linearize the f_bof/f_eaf * total_steel products and to size route bounds.
 param dem{t in T} := base_demand * (1 + growth_rate)^(ord(t) - 1);
 
 # TECHNICAL PARAMETERS 
@@ -123,22 +121,7 @@ param n8_cs default 0.01;                # Coal (ton) per tCS
 param n8_ss default 0.15;                # Slag (ton) per tCS 
 param n8_eafg default 3;                 # EAF Gas (GJ) per tCS                          
    
-
-# ============================================================================
-# SCRAP BLENDING (mip-v3, LINEAR). Scrap can be used three ways:
-#   1. blended into the BF-BOF metallic charge (displacing hot metal 1:1),
-#   2. blended into the DRI-EAF metallic charge (coal / NG / H2 sub-routes,
-#      displacing DRI 1:1),
-#   3. as 100% scrap-based steel via the dedicated Scrap-EAF route (1.1 t/tCS).
-# The per-route blended-scrap FLOW is the decision each year (X_scrap_in vars);
-# the blend share of the route's METALLIC CHARGE (n3_metallic_bof / n7_dri_ratio
-# = 1.1 t per tCS) is an OUTCOME, kept within a metallurgical BAND
-# [phi_min_X, phi_max_X] and smoothed by a flow RAMP (blend practice cannot
-# change faster than blend_ramp of the charge per year). All constraints are
-# linear -- flow bounds proportional to output, no fraction variables. 2025 is
-# pinned to the observed baseline blends phi0_*. The shared availability pool
-# (scrap_bound) allocates scrap across all uses from 2026 on.
-# ============================================================================
+# SCRAP BLENDING 
 param phi0_bof      default 0.09;    # 2025 baseline scrap share of BOF metallic charge
 param phi0_cdri     default 0.382;   # 2025 baseline scrap share, Coal DRI-EAF/IF charge
 param phi0_ngdri    default 0.13;    # 2025 baseline scrap share, NG DRI-EAF charge
@@ -150,37 +133,9 @@ param phi_max_bof   default 0.20;    # max scrap share of BF-BOF metallic charge
 param phi_max_cdri  default 0.40;    # max scrap share of Coal DRI-EAF charge
 param phi_max_ngdri default 0.40;    # max scrap share of NG DRI-EAF charge
 param phi_max_h2dri default 0.40;    # max scrap share of H2 DRI-EAF charge
-# Blend-practice ramp: year-on-year change in a route's blended-scrap flow is
-# capped at blend_ramp x (this year's metallic charge), i.e. the blend share can
-# move at most ~5 pp/yr (plus output-growth headroom). Applies to the incumbent
-# BOF/coal/NG practices; H2-DRI is a new route (no incumbent practice) and is
-# exempt. Sweep with `let blend_ramp := X;`.
 param blend_ramp    default 0.05;
 
-# ============================================================================
-# POWER-TRANSITION SCENARIO (mip-v3): TWO axes, tech vs grid.
-# The former single theta_power conflated two different kinds of uncertainty;
-# it is split into:
-#   theta_tech -- GLOBAL technology learning: electrolyser + renewable capex
-#     (and the H2 firming adder, which scales with the electrolyser path).
-#     Set on world markets, exogenous to India; drives GREEN-H2 COST ONLY
-#     (the H2 island is behind-the-meter, decoupled from tariff and EF).
-#   theta_grid -- INDIA power-system outcome: grid emission factor + industrial
-#     tariff. Partially caused by global RE costs but mediated by domestic
-#     policy/DISCOM politics; drives CCS opex, EAF/IF power cost, Scope 2, WHR
-#     credit. The tariff endpoints STRADDLE "no decline" (0.085 slow / 0.055
-#     fast): even fast-grid worlds do not assume aggressive tariff relief.
-# Both in [0,1], 0 = slow transition, 1 = fast. All 2025 anchors are FIXED, so
-# calibration ($5/kg H2, $125/t CCS, 0.07 $/kWh) never moves; thetas only
-# spread the 2050 endpoints. Correlation between the axes belongs in the
-# SAMPLER (e.g. rank-corr ~0.5 or a 2D grid), not welded into the model -- the
-# off-diagonal world (cheap global tech, dirty expensive grid: industry builds
-# RE islands BECAUSE the grid disappoints) must stay reachable.
-# CCS capital is on its own learning axis (CCSVAL anchors), untouched by either.
-# Sweep with `let theta_tech := X; let theta_grid := Y;`. Per-component
-# overrides: the slow/fast anchors are plain data params, and a scenario
-# `let n9_grid_ef_end := X;` still wins over the theta_grid default.
-# ============================================================================
+# POWER-TRANSITION SCENARIO 
 param theta_tech default 0;              # global tech learning speed (H2 axis)
 param theta_grid default 0;              # India grid outcome speed (EF + tariff)
 param grid_price_start    default 0.07;    # 2025 grid tariff, $/kWh (fixed anchor)
@@ -188,24 +143,10 @@ param grid_price_end_slow default 0.085;   # 2050 grid tariff, slow (straddles f
 param grid_price_end_fast default 0.055;   # 2050 grid tariff, fast
 param grid_ef_end_slow    default 0.0006; # 2050 grid EF, slow (tCO2/kWh)
 param grid_ef_end_fast    default 0.0003; # 2050 grid EF, fast
-# H2-side endpoints calibrated so the EMERGENT 2050 LCOH spans the scenario
-# bands: theta_tech = 0 -> ~$3.7/kg (expensive band $3-4), theta_tech = 1 ->
-# ~$1.8/kg (cheap band $1-2). 2050 H2 cost is never specified directly.
 param h2elec_capex_end_slow default 550;   # 2050 electrolyser capex $/kW, slow
 param h2elec_capex_end_fast default 150;   # 2050 electrolyser capex $/kW, fast (DOE optimistic)
 param re_capex_end_slow   default 600;     # 2050 renewable capex $/kW, slow
 param re_capex_end_fast   default 200;     # 2050 renewable capex $/kW, fast (IRENA optimistic solar)
-
-# theta_ccs -- CAPTURE-PLANT LEARNING axis (independent of both thetas above;
-# CCS cost evolution is not a power-sector outcome). It sets how far the 2050
-# overnight capture capex falls below the 2025 calibrated value; the realized
-# 2050 CCS cost then EMERGES as capex(theta_ccs) + compression power
-# (theta_grid tariff) + regen steam + solvent + T&S -- never specified
-# directly. Emergent 2050 CAPTURE cost (ex-T&S, the literature convention):
-# theta_ccs = 0 -> ~$84/t (expensive band $60-100), theta_ccs = 1 -> ~$42/t
-# (cheap band $30-60); add ccs_ts_cost ($20) for the all-in.
-# (This RETIRES the old n10_ccs_cost_end 2050 all-in anchor -- kept declared
-#  only so legacy CCSVAL driver tokens do not error; it is no longer used.)
 param theta_ccs default 0;                 # capture-plant learning speed
 param ccs_capex_fall_slow default 0.30;    # 2050 overnight-capex decline vs 2025, slow
 param ccs_capex_fall_fast default 0.80;    # 2050 overnight-capex decline vs 2025, fast
@@ -223,14 +164,9 @@ param n9_grid_ef{t in T} :=
 # Carbon capture
 param n10_ccs_eta default 0.85;                        # Carbon capture efficiency                      
 
-
 # COST PARAMETERS 
 #Global parameters (all costs are in $)
 param ng_cost_ccoal default 184;          # Cost per ton of coking coal
-# Grid tariff path, $/kWh: fixed 2025 anchor, theta_grid-coupled 2050 endpoint
-# (flat 0.07 at theta_grid=0.5; endpoints straddle flat, so slow-grid worlds see
-# RISING tariffs). Drives ALL grid-powered loads incl. CCS compression -- NOT
-# the green-H2 island, whose electricity is the dedicated-RE capital below.
 param ng_cost_power{t in T} :=
     grid_price_start
     + ( (grid_price_end_slow + theta_grid*(grid_price_end_fast - grid_price_end_slow))
@@ -245,54 +181,28 @@ param ng_cost_pcoal default 110;          # Cost per ton of PCI coal
 param ng_credit_slag default 15;          # Selling cost per ton of slag
 param ng_cost_scrap default 350;          # Cost per ton of scrap
 param ng_cost_ncoal default 98;          # Cost per ton of non coking coal
-
-
 param n0_credit_breeze default 55;        # Selling cost per ton of breeze
 param n0_credit_tar default 20;           # Selling cost per ton of tar
 param n0_capex default 40;                # CAPEX of cokeoven per tCS rpoduction
-
 param n1_cost_breeze default 85;          # Cost per ton of breeze                         
 param n1_capex default 30;                # CAPEX of sinter plant per tCS production
-
 param n2_capex default 80;               # CAPEX of blast furnace per tCS production
-
-param n3_capex default 40;                # CAPEX of BOF per tCS production        
-                        
+param n3_capex default 40;                # CAPEX of BOF per tCS production                             
 param n4_capex_coal default 110;          # CAPEX of Coal-DRI per tCS production
-
 param n5_capex_ng := 90;                  # CAPEX of NG-DRI per tCS production
 param n5_cost_NG {t in T} default 10;     # Cost of natural gas per MMBtu
-
-# The former all-in delivered H2 price (ng_cost_h2_start/end -> ng_cost_h2) has been
-# REMOVED: hydrogen capital is now explicit sunk electrolyser + renewable builds (see
-# the green-H2 block at the end of this file and v_capacity.mod) and only a residual
-# variable opex (h2_opex) remains in the price. The primary uncertainty axis is the
-# global tech-learning scalar theta_tech; h2_capex_mult composes on top.
 param ng_h2_start_year default 2040;
 param n6_capex_h2{t in T} :=
     if t <= 2025 then 120
     else 120+ (90-120) * (t-2025)/25;     # CAPEX of H2-DRI per tCS from 2025 to 2050
-
 param n7_capex default 70;                # CAPEX of EAF plant (DRI based) per tCS
 param n7_cost_electrode default 600;      # Cost per ton of electrode
-
 param n8_capex default 70;                # CAPEX of EAF plant (Scrap-based) per tCS     
-param n8_cost_electrode default 600;      # Cost per ton of electrode
-   
+param n8_cost_electrode default 600;      # Cost per ton of electrode   
 param n9_whr_capex default 0.009;         # CAPEX of WHR system per kWh of power generated
 param n9_whr_opex default 0.003;          # OPEX of WHR system per kWh of power generated
-
-# ALL-IN 2025 CCS anchor price ($/tCO2), INCLUSIVE of capex, O&M, energy
-# (electricity + steam), solvent, and transport & storage. Used only to
-# CALIBRATE the 2025 overnight capex (backed out by netting the other
-# components at fixed reference prices). The 2050 CCS cost is NOT anchored --
-# it emerges from the theta_ccs capex-learning path + energy prices (see the
-# POWER-TRANSITION block). n10_ccs_cost_end is DEPRECATED and unused; it stays
-# declared only so legacy CCSVAL driver tokens (`let n10_ccs_cost_end := X;`)
-# do not error.
 param n10_ccs_cost_start default 125;
 param n10_ccs_cost_end default 75;   # DEPRECATED (no effect); CCS 2050 axis = theta_ccs
-
 param carbon_tax default 0; 
 param labor_cost default 20;              # Labor cost per tCS
 param maintenance_cost default 15;        # Maintenance cost per tCS
@@ -303,192 +213,85 @@ param real_discount_rate := 0.06;
 param n8_scrap_rate default 0.06;
 param n8_scrap_limit{t in T};
 param n5_ng_cap {T};
-# Coking-coal availability ceiling (imported coke-making coal for BF; PCI and indigenous
-# thermal DRI coal are NOT capped). Default 1e12 = effectively no limit, so runs without a
-# coking scenario file behave as before; scarce/normal/abundant set via scenarios/ccoal_*.
 param ccoal_cap {T} default 1e12;
 
-# ============================================================================
-# CAPACITY-EXPANSION PARAMETERS  (branch: capex-opex-framework)
-# Overnight-capex + fixed/variable-opex framework; consumed by v_capacity.mod
-# and r_cost.mod. See modules/v_capacity.mod for the formulation notes.
-# ============================================================================
 
-# --- 2025 installed capacity per route (tonnes crude steel, on each route's
-#     OUTPUT var). mip-v3 scrap-blending recalibration: the old 33.5 Mt
-#     "scrap-EAF" fleet was really the IF secondary sector, which blends sponge
-#     iron + scrap -- it is FOLDED INTO Coal DRI-EAF/IF (70.6 + 33.5 = 104.1 Mt).
-#     Dedicated 100% Scrap-EAF is 0.75 Mt installed with zero 2025 production.
+
+
+# 2025 installed capacity per route 
 param cap0_bof   default 90.00e6;             # steel_bof
 param cap0_cdri  default 104.10e6;            # coaldri_output (coal-DRI + IF fleet)
 param cap0_ngdri default 12.90e6;             # ngdri_output   (crude steel)
 param cap0_h2dri default 0;                   # h2dri_output   (none in 2025)
 param cap0_scrap default 0.75e6;              # steel_scrap_eaf (dedicated 100% scrap-EAF)
 
-# --- Asset lifetimes (yr) = build lock-in horizon (from former u_lockin horizons).
+# Asset lifetimes (yr) = build lock-in horizon (from former u_lockin horizons).
 param life_bof   default 25;
 param life_cdri  default 20;
 param life_ngdri default 20;
 param life_h2dri default 25;
 param life_scrap default 15;
 
-# --- Common capacity-addition ceiling (max new build/yr, tonnes crude steel).
-# mip-v3: ONE absolute slab shared by all four major routes (BF-BOF, coal-DRI,
-# NG-DRI, scrap-EAF) -- the former tech-specific fractions of the 2025 fleet
-# (cap_add_frac_*) had no clear justification and produced inconsistent effective
-# limits across routes. 10 Mt/yr for now; a sensitivity-analysis axis later.
-# H2-DRI is not governed by this -- its build rate is set by the electrolyser
-# Gaussian envelope (v_capacity.mod). Sweep with `let cap_add_common := X;`.
+# Common capacity-addition ceiling 
 param cap_add_common default 10e6;
 
-# --- Minimum capacity utilisation (private-player discipline): production must be at
-# least util_min_X of installed capacity, i.e. the idle capacity-production gap is capped
-# at 1-util_min_X. The rationale is ECONOMIC first, technical second:
-#   - ECONOMIC: below a break-even utilisation, fixed costs (capital service + labour +
-#     maintenance, all charged on capacity via fixopex_cost) spread over too few tonnes,
-#     unit cost blows up, and a private operator runs at a loss -> they SHUT rather than
-#     limp along. The floor encodes that discrete "operate above break-even or exit"
-#     reality (the model already PRICES idling via fixed opex; the floor forbids the
-#     loss-making low-utilisation branch a real owner would never choose). The "exit"
-#     side is available to incumbents via faster legacy retirement; new builds are
-#     committed for their life (the sunk-capital irreversibility), so for them it reads
-#     "run above break-even or don't build it".
-#   - TECHNICAL: this reinforces the ranking. BF-BOF highest (blast furnace runs baseload,
-#     cannot be turned down without damage -> high break-even); scrap-EAF lowest
-#     (batch/modular, cheaply idled -> low break-even); DRI shafts in between.
-# Applied from 2026 on (the 2025 fleet is calibrated to observed shares and inherits real
-# low utilisation, e.g. BF-BOF ~64%, so first(T) exempt).
+# capacity utilisation 
 param util_min_bof   default 0.85;
 param util_min_cdri  default 0.75;
 param util_min_ngdri default 0.70;
 param util_min_h2dri default 0.70;
 param util_min_scrap default 0.60;
-
-# --- Maximum capacity utilisation (mip-v3): 100% is not achievable in practice
-# -- annual maintenance shutdowns, raw-material supply shocks, unplanned
-# outages. One common ceiling for all routes: production <= util_max * installed
-# capacity, i.e. serving demand requires building ~1/0.95 of it in nameplate.
 param util_max default 0.95;
 
-# --- Fixed opex per unit CRUDE-STEEL capacity per year (labour + maintenance).
-#     Incurred on installed capacity whether or not it runs. Route-indexed so
-#     per-route values can be supplied later; defaults to the global figure.
+# Fixed opex per unit CRUDE-STEEL capacity per year 
 param fopex_bof   default labor_cost + maintenance_cost;
 param fopex_cdri  default labor_cost + maintenance_cost;
 param fopex_ngdri default labor_cost + maintenance_cost;
 param fopex_h2dri default labor_cost + maintenance_cost;
 param fopex_scrap default labor_cost + maintenance_cost;
 
-# --- Capital recovery factor CRF(L) at the real discount rate.
+# Capital recovery factor CRF(L) at the real discount rate.
 param crf_bof   := real_discount_rate*(1+real_discount_rate)^life_bof  /((1+real_discount_rate)^life_bof  -1);
 param crf_cdri  := real_discount_rate*(1+real_discount_rate)^life_cdri /((1+real_discount_rate)^life_cdri -1);
 param crf_ngdri := real_discount_rate*(1+real_discount_rate)^life_ngdri/((1+real_discount_rate)^life_ngdri-1);
 param crf_h2dri := real_discount_rate*(1+real_discount_rate)^life_h2dri/((1+real_discount_rate)^life_h2dri-1);
 param crf_scrap := real_discount_rate*(1+real_discount_rate)^life_scrap/((1+real_discount_rate)^life_scrap-1);
 
-# --- Annualised capital charge per unit route output (bundled over the route's
-#     process chain; reuses the existing n*_capex levelized figures). mip-v3: all
-#     route outputs are plain crude steel, so the per-tCS capex figures apply
-#     directly (no basis conversion).
+# Annualised capital charge per unit route output 
 param acapex_bof   := n0_capex + n1_capex + ng_capex_pell + n2_capex + n3_capex;          # $/tCS/yr
 param acapex_cdri  := n4_capex_coal + ng_capex_pell + n7_capex;                           # $/tCS/yr
 param acapex_ngdri := n5_capex_ng   + ng_capex_pell + n7_capex;                           # $/tCS/yr
 param acapex_h2dri {t in T} := n6_capex_h2[t] + ng_capex_pell + n7_capex;                 # $/tCS/yr
 param acapex_scrap := n8_capex;                                                           # $/tCS/yr
 
-# --- Overnight capex per unit capacity = annualised charge / CRF.
+# Overnight capex per unit capacity = annualised charge / CRF.
 param ocapex_bof   := acapex_bof   / crf_bof;
 param ocapex_cdri  := acapex_cdri  / crf_cdri;
 param ocapex_ngdri := acapex_ngdri / crf_ngdri;
 param ocapex_h2dri {t in T} := acapex_h2dri[t] / crf_h2dri;
 param ocapex_scrap := acapex_scrap / crf_scrap;
 
-# Scrap supply-chain expansion capex (collection + high-end processing/purification
-# yards), overnight $/(t scrap/yr). ~$100/t-cap reflects shredding + sensor-sorting
-# + copper/tramp purification (furnace-ready scrap), not just collection. Charged on
-# growth in scrap-handling capacity above the 2025 baseline (v_capacity.mod). Operating
-# cost + the existing chain are already embedded in the delivered scrap price.
-# Plain data param -> sweep with `let ocapex_scrapchain := X;`.
+# supply-chain expansion capex 
 param ocapex_scrapchain default 100;
-
-# Fossil supply-network expansion capex (coal mines/transport; NG pipelines/terminals),
-# overnight $/(t-fuel/yr), charged on growth in supply capacity above the 2025 baseline
-# (v_capacity.mod). DEFAULT 0: these are MATURE networks whose capital is already
-# absorbed in the delivered commodity prices (coking/non-coking/PCI coal, NG $/MMBtu),
-# so by default they add no cost and the model is unchanged. Set > 0 to charge capex on
-# fossil supply GROWTH (e.g. to test new mine/pipeline build-out under demand expansion);
-# the framework is then symmetric with scrap and green-H2. Sweep with `let ocapex_* := X;`.
 param ocapex_coalchain default 0;     # $/(t-coal/yr)
 param ocapex_ngchain   default 0;     # $/(t-NG/yr)
 
-# (Fixed opex is the labour+maintenance figure declared above as fopex_*,
-#  charged on installed capacity in v_capacity.mod; no %-of-capex term.)
-
-# --- Mode-1 (linear) electrolyser-capacity ramp coefficient: the additive ceiling on
-#     cap_h2elec additions is ramp_frac * H2_cap per year (a fixed annual slab, NOT a
-#     compounding %). Reflects ~constant annual capital availability. Sweep token RAMPVAL.
-#     Typically 0.15. (Used only in mode 1; modes 0/2 set the ceiling value differently.)
 param ramp_frac default 0.15;
-
-# Ablation toggle for the sunk-capital effect:
-#   sunk=1 (default, real model): capex on BUILDS, fixed opex on CAPACITY -> capital
-#     committed once built; idling/stranding does not recover it.
-#   sunk=0 (counterfactual): capex + fixed opex charged on PRODUCTION (old LCOE style),
-#     so building-then-idling costs nothing -> the optimizer can switch tech freely.
 param sunk default 1;
 
-# ============================================================================
-# CCS retrofit (mip-v3 rework): explicit COMPONENT build-up, calibrated to the
-# all-in anchor prices n10_ccs_cost_start/end ($125 -> $75 /tCO2, inclusive of
-# transport & storage). Components:
-#   - overnight CAPEX (ocapex_ccs, $ per tCO2/yr capture capacity), SUNK on
-#     retrofit builds (v_capacity.mod);
-#   - fixed O&M = ccs_fom_pct x overnight capex per year;
-#   - ELECTRICITY: compression + auxiliaries only (ccs_kwh_*), charged at the
-#     grid tariff ng_cost_power[t] -> responds to the theta power scenario and
-#     carries Scope 2 through the grid power balance;
-#   - STEAM for solvent regeneration (ccs_steam_*, GJ/tCO2), sourced from the
-#     WASTE-HEAT POOL in competition with WHR power (opportunity cost =
-#     foregone power credit; o_waste_heat.mod) with a gas-fired BACKUP BOILER
-#     whose CO2 is EMITTED, never captured (q_carbon_capture / s_emissions);
-#   - solvent makeup and transport & storage as volume costs ($/tCO2).
-# CALIBRATION: overnight capex is BACKED OUT of the all-in anchor by netting the
-# other components at FIXED reference prices (ccs_ref_*, deliberately NOT the
-# live theta paths -- theta must move CCS *operating* cost, not the capture
-# plant's capital):
-#   allin[t] = ocapex*(crf_ccs+ccs_fom_pct) + kwh_bf*ref_elec + steam_bf*ref_steam
-#              + solvent + T&S            (at the reference BF stream)
-# 2025 check: 125 - 20 - 5 - 130*0.07 - 3.0*5 = 75.9 -> ocapex ~= 531 $/(tCO2/yr).
+
+# CCS retrofit 
 param life_ccs default 15;                       # retrofit asset life (yr)
 param crf_ccs := real_discount_rate*(1+real_discount_rate)^life_ccs/((1+real_discount_rate)^life_ccs-1);
 param ccs_fom_pct default 0.04;                  # fixed O&M as fraction of overnight capex, /yr
 param ccs_vopex_solvent default 5;               # solvent makeup, $/tCO2 (placeholder)
 param ccs_ts_cost default 20;                    # transport + storage, $/tCO2 (volume cost, NOT %capex)
-
-# --- Stream-specific adjustment: cost & energy depend on the stream's CO2
-#     concentration -- per-molecule capture energy is INVERSELY related to how
-#     CO2-rich the gas is (a richer flue is easier to separate). Concentration
-#     ordering across this model's streams:
-#       pure process CO2  <  BFG (~20-25%)  <  coal kiln off-gas (~15-20%)
-#                         <  NG combustion flue (~4-8%)
-#     i.e. coal-derived flue takes a bit LESS energy per tCO2 than NG-derived
-#     flue, even though a coal stream carries more total CO2. Multiplier scales
-#     capex/FOM; ccs_kwh_* is COMPRESSION + AUXILIARIES only (regen heat is the
-#     explicit steam demand ccs_steam_*).
 param ccs_mult_bf    default 1.0;    # baseline (concentrated BFG ~20-25% CO2)
 param ccs_mult_cdri  default 1.2;    # leaner coal kiln off-gas -> a bit dearer than BFG
 param ccs_kwh_bf     default 130;    # kWh/tCO2, compression + auxiliaries
 param ccs_kwh_cdri   default 150;    # leaner -> more blower/aux power
 param ccs_steam_bf   default 3.0;    # GJ regen steam per tCO2 (amine, BFG stream)
 param ccs_steam_cdri default 3.3;    # leaner -> more regen steam
-
-# NG-DRI is a TWO-STREAM BLEND: its capturable base counts ALL the NG carbon,
-# but only ccs_ngdri_proc_share of it arises in the already-separated process
-# stream (MIDREX/HYL CO2-removal loop: compression only, negligible regen);
-# the remainder exits as dilute reformer/burner combustion flue -- the LEANEST
-# gas of all, so per tCO2 it takes MORE energy than coal flue (the endpoints
-# below sit above the cdri figures). The costed ngdri parameters are the
-# capture-weighted blend of the two endpoints.
 param ccs_ngdri_proc_share default 0.6;   # share of NG-DRI capturable CO2 in the process stream
 param ccs_kwh_ng_proc   default 110;      # process stream: mostly compression
 param ccs_kwh_ng_flue   default 170;      # NG flue (~4-8% CO2): leanest -> most aux power
@@ -499,19 +302,12 @@ param ccs_mult_ng_flue  default 1.3;      # NG flue: dearest capture plant per t
 param ccs_kwh_ngdri   := ccs_ngdri_proc_share*ccs_kwh_ng_proc   + (1-ccs_ngdri_proc_share)*ccs_kwh_ng_flue;
 param ccs_steam_ngdri := ccs_ngdri_proc_share*ccs_steam_ng_proc + (1-ccs_ngdri_proc_share)*ccs_steam_ng_flue;
 param ccs_mult_ngdri  := ccs_ngdri_proc_share*ccs_mult_ng_proc  + (1-ccs_ngdri_proc_share)*ccs_mult_ng_flue;
-
-# --- Calibration reference prices (FIXED; do not track theta) ---
 param ccs_ref_elec  default 0.07;    # $/kWh used only to back out capex from the anchor
 param ccs_ref_steam default 5;       # $/GJ  ditto (~waste-heat steam opportunity cost)
-
-# --- Backup boiler + waste-heat steam conversion ---
 param ccs_boiler_eff default 0.85;   # backup boiler efficiency (GJ steam / GJ NG fuel)
 param ng_gj_per_mmbtu := 1.055;      # GJ per MMBtu (NG price unit conversion)
 param ng_co2_gj default 0.0521;      # tCO2 per GJ NG fuel (= 0.055 t/MMBtu)
 param whr_steam_eff default 0.85;    # waste-heat pool gas (GJ) -> LP steam (GJ)
-
-# 2025 overnight capex backed out of the $125 all-in anchor (floored: an anchor
-# below the netted components would give negative capex).
 param ocapex_ccs_2025 :=
     max( n10_ccs_cost_start
          - ccs_ts_cost - ccs_vopex_solvent
@@ -524,52 +320,12 @@ param ccs_capex_fall := ccs_capex_fall_slow + theta_ccs*(ccs_capex_fall_fast - c
 param ocapex_ccs {t in T} := ocapex_ccs_2025 * (1 - ccs_capex_fall*(t - 2025)/25);
 param fom_ccs    {t in T} := ccs_fom_pct * ocapex_ccs[t];   # fixed O&M $/tCO2-cap/yr
 
-# ============================================================================
-# GREEN-H2 SUPPLY CHAIN: electrolyser + dedicated renewable (sunk capacity)
-# ----------------------------------------------------------------------------
-# The former all-in delivered H2 price (ng_cost_h2) dissolved the entire hydrogen
-# supply chain into a smooth per-tonne cost, so the model could scale H2 up or down
-# with NO capital commitment -- the one part of the transition exempt from the
-# sunk-capital logic. This block splits it into:
-#   (i)  SUNK CAPITAL, built and vintaged like a production route:
-#          - electrolyser stacks         (cap_h2elec, t-H2/yr)
-#          - dedicated renewable supply   (cap_h2re,   kW) that powers them
-#        both charged on build_* with overnight capex in v_capacity.mod;
-#   (ii) a small residual VARIABLE opex h2_opex (water + stack O&M). The green
-#        electricity is now supplied by the dedicated renewables (sized to cover
-#        the electrolyser load), NOT purchased at a $/t price -- so H2 stays green
-#        and its power is behind-the-meter (excluded from the grid balance).
-# Total green-H2 demand = DRI use (h2dri_h2_in) + BF injection (bf_h2_in).
-# VALUES BELOW ARE PLACEHOLDERS in published 2024-25 ranges -- sweep them. Provenance:
-#   electrolyser system capex ~$800-1200/kW (2024, alkaline/PEM) falling to a few
-#     hundred $/kW by 2050 (IEA Global Hydrogen Review 2024; DOE PEM cost report);
-#   electrolyser electricity ~50-55 kWh/kg incl. balance-of-plant;
-#   solar PV $691/kW and onshore wind $1041/kW total installed cost (IRENA,
-#     Renewable Power Generation Costs in 2024) -> blended hybrid used here.
-# ============================================================================
-# LCOH COMPONENT CALIBRATION (mip-v3): literature (e.g. Jindal et al. 2024,
-# 10.1016/j.esd.2024.101549) puts ELECTRICITY at 40-60% of LCOH and the
-# ELECTROLYSER at 30-40%, remainder other costs. With re_cf = 0.35 (realistic
-# India solar-wind hybrid) and an $850/kW 2025 electrolyser, the 2025 build-up
-# at the $5/kg anchor decomposes as:
-#   electricity (RE capital+FOM ~28% + firming/storage ~27%)  ~55%   [40-60] ok
-#   electrolyser (capex+FOM)                                  ~39%   [30-40] ok
-#   other (water + stack O&M opex)                             ~6%
-# The firming adder is DELIVERED-FIRM-POWER cost (storage/oversizing to feed a
-# continuous shaft from CF-0.35 RE) and is classified under electricity.
+
+# GREEN-H2 SUPPLY CHAIN
 param h2_kwh_per_t default 55000;     # electrolyser electricity, kWh per t H2 (~55 kWh/kg incl BoP)
 param re_cf        default 0.35;      # dedicated renewable capacity factor (India solar/wind hybrid)
 param h2_opex{t in T} default 300;    # residual H2 variable opex (water + stack O&M), $/t H2
-# Residual uncertainty multiplier on the green-H2 supply-chain overnight capex
-# (electrolyser + firming + renewable). The PRIMARY H2-cost axis is now the
-# global tech-learning scalar theta_tech (which sets the capex-path endpoints);
-# h2_capex_mult is kept as a composable secondary multiplier so existing drivers
-# (token H2CAPXVAL) keep working: 1 = central, <1 cheaper, >1 dearer.
 param h2_capex_mult default 1;
-
-# --- Electrolyser: overnight capex $/kW, fixed 2025 anchor ($850: mid
-#     alkaline/PEM system range, keeps the electrolyser LCOH share in the
-#     30-40% literature band), theta_tech-coupled 2050 endpoint ---
 param h2elec_capex_start default 850;
 param h2elec_capex_kw{t in T} :=
     h2elec_capex_start
@@ -578,26 +334,12 @@ param h2elec_capex_kw{t in T} :=
 param life_h2elec default 15;         # electrolyser plant life (incl stack replacement)
 param crf_h2elec := real_discount_rate*(1+real_discount_rate)^life_h2elec/((1+real_discount_rate)^life_h2elec-1);
 param fopex_h2elec default 400;       # fixed O&M, $/(t-H2/yr)/yr (placeholder ~3% of capex)
-
-# --- Dedicated renewable generation: overnight capex $/kW, fixed 2025 anchor,
-#     theta_tech-coupled 2050 endpoint (450 at theta_tech=0.5). Blended solar/
-#     wind hybrid, between IRENA 2024 solar ($691/kW) and onshore wind ($1041/kW).
 param re_capex_kw{t in T} :=
     800 + ( (re_capex_end_slow + theta_tech*(re_capex_end_fast - re_capex_end_slow))
             - 800 )*(t-2025)/25;
 param life_re default 25;             # renewable plant life
 param crf_re := real_discount_rate*(1+real_discount_rate)^life_re/((1+real_discount_rate)^life_re-1);
 param fopex_h2re default 15;          # fixed O&M, $/kW/yr (placeholder ~2% of capex)
-
-# --- H2 FIRMING/STORAGE (mip-v3): a CF-0.35 renewable island cannot feed a
-# continuous DRI shaft without hydrogen buffer storage / oversizing -- a real
-# cost the bare stacks+panels build-up omits. The firming adder is CALIBRATED
-# so the 2025 levelized cost of hydrogen equals lcoh_2025_target ($5/kg
-# central), and it declines proportionally to the electrolyser capex path
-# (theta_tech-coupled). It represents storage + oversizing + balance-of-system
-# -- i.e. the cost of DELIVERED FIRM ELECTRICITY, classified under the
-# electricity share of LCOH (see the calibration note above) -- and is charged
-# on electrolyser builds (same life/CRF) for mechanical simplicity.
 param lcoh_2025_target default 5000;  # $/t H2 (= $5/kg) calibration anchor
 param h2_kw_per_t := h2_kwh_per_t/(8760*re_cf);   # kW of dedicated RE per (t-H2/yr)
 param h2_lcoh_base_2025 :=            # 2025 LCOH of the bare build-up (no firming, mult=1)
@@ -608,55 +350,18 @@ param h2_firm_capex{t in T} :=        # overnight $ per (t-H2/yr), declines with
     max(lcoh_2025_target - h2_lcoh_base_2025, 0)/crf_h2elec
     * h2elec_capex_kw[t]/h2elec_capex_kw[2025];
 
-# Convert $/kW -> overnight $ per (t-H2/yr) of nameplate output at the renewable CF
-# (1 kW over a year at re_cf -> 8760*re_cf kWh -> /h2_kwh_per_t t-H2/yr), plus the
-# firming/storage adder above.
 param ocapex_h2elec{t in T} := h2_capex_mult * ( h2elec_capex_kw[t]/(8760*re_cf/h2_kwh_per_t)
-                                                 + h2_firm_capex[t] );
+                                                + h2_firm_capex[t] );
 param acapex_h2elec{t in T} := ocapex_h2elec[t] * crf_h2elec;   # annualized (for the 1-sunk branch)
 param ocapex_h2re{t in T} := h2_capex_mult * re_capex_kw[t];    # overnight $/kW (charged on build, in kW)
 param acapex_h2re{t in T} := ocapex_h2re[t] * crf_re;           # annualized $/kW/yr (for the 1-sunk branch)
-
-# --- H2 ramp mode: how fast green H2 may scale. SAME formalism in every mode -- the
-# electrolyser-capacity ceiling (and the four route cap_add ceilings) are always present;
-# only the ceiling VALUE switches by mode. The model stays a pure LP throughout.
-#   0: NO LIMITS -- every ceiling value = H2_BIGM (inf), on electrolysers AND the four
-#      conventional routes. Unphysical counterfactual baseline (constraints' total effect).
-#   1: LINEAR -- electrolyser-capacity ceiling = ramp_frac * H2_cap per year (fixed
-#      additive slab); the four routes keep their cap_add slabs.
-#   2 (default): RISING-BASELINE + GAUSSIAN-TRANSITION ceiling on the annual capacity ADDITION
-#      (the ALLOWED EXPANSION). The yearly build is bounded by a fixed reference scale
-#      times a (rising baseline + Gaussian surge) rate -- it does NOT compound off last
-#      year's installed capacity:
-#        cap[t] - cap[t-1] <= h2_ref_cap * ( base(t) + h2_gauss_amp * kernel(t) )
-#        base(t)   = h2_base_start + (h2_base_end - h2_base_start) * (t-2025)/25
-#        kernel(t) = exp( -(t - h2_peak_year)^2 / (2*h2_gauss_sigma^2) )
-#      (i)  a RISING baseline: a fixed amount of capital buys MORE capacity over time as
-#           logistics/manufacturing mature (the same capital-efficiency that already drives
-#           the declining h2elec_capex_kw); so the floor tilts up h2_base_start -> h2_base_end.
-#      (ii) a RAPID-TRANSITION surge at the peak year, tapering each side (a Gaussian
-#           add-rate -> a smooth S-step in installed capacity). The surge amplitude is
-#           PINNED so the TOTAL rate at the peak equals h2_peak_rate (25%):
-#               surge_amp = h2_peak_rate - base(h2_peak_year)
-#           i.e. base(peak) + surge_amp = h2_peak_rate exactly. A later peak (higher
-#           baseline) therefore gets a smaller surge; the total peak is always 25%.
-#      Because the baseline rises, the post-transition right tail sits permanently above the
-#      pre-transition left tail (the visible "step" = the capital-efficiency gain). The peak
-#      YEAR shifts per scenario; reference scale, baseline endpoints, peak rate and width fixed.
 param h2_ramp_mode  default 2;          # 0 none (inf ceiling) | 1 linear | 2 gaussian (default, realistic)
 param H2_BIGM       := 1e10;            # deactivates whichever limiter is off (~300x max cap)
-# Reference scale for mode-2 add-rates (t-H2/yr); peak add = h2_peak_rate * this
-# (0.25*4 Mt = 1.0 Mt-H2/yr central). Sweepable (H2 ramp axis, paired with
-# cap_add_common in the H2_Delay study): 4e6/6e6/8e6 -> peaks 1.0/1.5/2.0
-# Mt-H2/yr, baseline tail scaling proportionally.
 param h2_ref_cap    default 4000000;
 param h2_peak_rate  := 0.25;            # the pinned mode-2 peak rate (base(peak)+surge = 25%)
 param h2_base_start := 0.00;            # mode 2 baseline coeff at 2025 (x h2_ref_cap, per yr)
 param h2_base_end   := 0.05;            # mode 2 baseline coeff at 2050 (rising -> capital efficiency)
 param h2_gauss_sigma := 2;              # Gaussian width (years); narrower -> sharper ramp, surge concentrated at peak
 param h2_base{t in T} := h2_base_start + (h2_base_end - h2_base_start)*(t-2025)/25;  # rising baseline rate
-# Scenario knob: year the buildout window crests. parameters.mod couples it to the H2
-# debut (h2_peak_year := ng_h2_start_year + 5) once the start year is concrete; a driver
-# may override it afterwards to treat the peak as a fully independent axis.
 param h2_peak_year  default 2035;
 
