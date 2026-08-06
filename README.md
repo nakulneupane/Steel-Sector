@@ -58,5 +58,8 @@ Three hydrogen deployment modes are available:
 - **Mode 2:** Gaussian deployment curve (default)
 
 ## Sunk Capital
+The model can represent investments in two ways:
 
-By default, investments are irreversible. Capital costs are incurred when capacity is built, even if that capacity is later underutilized. A counterfactual mode is also available where capital costs scale with production instead of installed capacity.
+- **`sunk = 1` (default):** Capital costs are paid when new capacity is built and cannot be recovered later. This represents real-world investment decisions and allows stranded assets.
+
+- **`sunk = 0`:** Capital and fixed operating costs are charged only on production. Capacity can be built, idled, or abandoned without financial penalty. This is a counterfactual setting used to isolate the effect of irreversible investments.
