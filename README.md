@@ -1,5 +1,5 @@
-# Steel-Sector-
-Modeling and optimization of steel sector in India: A time series analysis
+# Model Framework
+
 
 The model uses three learning parameters to represent future technological progress.
 
@@ -12,9 +12,7 @@ The model uses three learning parameters to represent future technological progr
 Both parameters range from **0 to 1**:
 - **0** = Slow transition
 - **1** = Fast transition
-
-# Model Framework
-
+- 
 ## Capacity Expansion
 
 The model explicitly tracks installed capacity for each steelmaking route. New capacity requires capital investment, has a fixed operating cost, and remains available throughout its lifetime. Annual expansion is limited by technology-specific deployment constraints.
