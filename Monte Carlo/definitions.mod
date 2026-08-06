@@ -3,6 +3,7 @@
 param base_demand default 152200000;  # Steel production at year 2025
 param growth_rate default 0.05;
 param dem{t in T} := base_demand * (1 + growth_rate)^(ord(t) - 1);
+param real_discount_rate := 0.06;
 
 # TECHNICAL PARAMETERS 
 # Global parameters
@@ -72,7 +73,6 @@ param n3_ls_bof default 0.075;      # Limestone (ton) per tCS in BOF
 param n3_sl_bof default 0.1;        # Slag (ton) per tCS in BOF
 param n3_bofg_bof default 100;      # BOFG gas (Nm3) formed per tCS in BOF
 param n3_rec_cog default 65;        # Recovered COG as fuel (Nm3/tCS)
-
 #All BOFG gas assumed being routed to power plant
 #Converting power plant streams to electricity and subtracting from energy input will 
 #reduce specific energy consumption
@@ -87,13 +87,15 @@ param n4_c_dri default 1;           # Coal (tons) per ton DRI
 param n5_e_dri default 120;         # Electricity (kWh) per ton DRI 
 param n5_pel_dri default 1.5;       # Pellets (tons) per ton DRI  
 param n5_ore_dri default 0.1;       # Ore (tons) per ton DRI 
-param n5_ng_dri default 0.35;       # Natural gas (tons) per ton DRI      
+param n5_ng_dri default 0.35;       # Natural gas (tons) per ton DRI  
+param n5_ng_cap {T};
 
 #H2 DRI
 param n6_e_dri default 110;         # Electricity (kWh) per ton DRI 
 param n6_pel_dri default 1.5;       # Pellets (tons) per ton DRI 
 param n6_ore_dri default 0.1;       # Ore (tons) per ton DRI     
 param n6_h2_dri default 0.07;       # Hydrogen (tons) per ton DRI (conservative incl. energy efficiency / shaft losses)
+param ng_h2_start_year default 2040;
 
 # EAF (DRI-Based)
 param n7_e_eaf {t in T} :=
@@ -113,15 +115,13 @@ param n8_eltrd default 0.003;            # Electrode (ton) per tCS
 param n8_ls default 0.06;                # Limestone (ton) per tCS 
 param n8_cs default 0.01;                # Coal (ton) per tCS 
 param n8_ss default 0.15;                # Slag (ton) per tCS 
-param n8_eafg default 3;                 # EAF Gas (GJ) per tCS                          
-   
+param n8_eafg default 3;                 # EAF Gas (GJ) per tCS                           
 # Scrap can be used three ways:
 #   1. blended into the BF-BOF metallic charge (displacing hot metal 1:1),
 #   2. blended into the DRI-EAF metallic charge (coal / NG / H2 sub-routes,
 #      displacing DRI 1:1),
 #   3. as 100% scrap-based steel via the dedicated Scrap-EAF route (1.1 t/tCS).
 # There is a limit set for blends
-
 param phi0_bof      default 0.09;    # 2025 baseline scrap share of BOF metallic charge
 param phi0_cdri     default 0.382;   # 2025 baseline scrap share, Coal DRI-EAF/IF charge
 param phi0_ngdri    default 0.13;    # 2025 baseline scrap share, NG DRI-EAF charge
@@ -134,6 +134,8 @@ param phi_max_cdri  default 0.40;    # max scrap share of Coal DRI-EAF charge
 param phi_max_ngdri default 0.40;    # max scrap share of NG DRI-EAF charge
 param phi_max_h2dri default 0.40;    # max scrap share of H2 DRI-EAF charge
 param blend_ramp    default 0.05;
+param n8_scrap_rate default 0.06;
+param n8_scrap_limit{t in T};
 
 #Technology Learning
 param theta_tech default 0;              # global tech learning speed (H2 axis)
@@ -156,7 +158,7 @@ param ccs_capex_fall_fast default 0.80;    # 2050 overnight-capex decline vs 202
 # Waste Heat Recovery
 param n9_eta default 0.15;                              # WHRS efficiency including losses
 param n9_whr {t in T} :=
-    0.05 +(0.3 - 0.05) * (t - 2025) / 25;               # WHRS penetration level from 30% in 2025 to 70% by 2050
+    0.05 +(0.3 - 0.05) * (t - 2025) / 25;               # WHRS penetration level from 5% in 2025 to 30% by 2050
 param n9_grid_ef_start default 0.000886; #0.000757 from grid having 36% share and 0.00096 from CPP having 64% share
 param n9_grid_ef_end default
     grid_ef_end_slow + theta_grid * (grid_ef_end_fast - grid_ef_end_slow);   # theta_grid-coupled (0.0003 at 0.5)
@@ -166,14 +168,9 @@ param n9_grid_ef{t in T} :=
 # Carbon capture
 param n10_ccs_eta default 0.85;                        # Carbon capture efficiency                      
 
-
 # COST PARAMETERS 
-#Global parameters (all costs are in $)
+# All costs are in $
 param ng_cost_ccoal default 184;          # Cost per ton of coking coal
-# Grid tariff path, $/kWh: fixed 2025 anchor, theta_grid-coupled 2050 endpoint
-# (flat 0.07 at theta_grid=0.5; endpoints straddle flat, so slow-grid worlds see
-# RISING tariffs). Drives ALL grid-powered loads incl. CCS compression -- NOT
-# the green-H2 island, whose electricity is the dedicated-RE capital below.
 param ng_cost_power{t in T} :=
     grid_price_start
     + ( (grid_price_end_slow + theta_grid*(grid_price_end_fast - grid_price_end_slow))
@@ -188,64 +185,38 @@ param ng_cost_pcoal default 110;          # Cost per ton of PCI coal
 param ng_credit_slag default 15;          # Selling cost per ton of slag
 param ng_cost_scrap default 350;          # Cost per ton of scrap
 param ng_cost_ncoal default 98;          # Cost per ton of non coking coal
-
-
 param n0_credit_breeze default 55;        # Selling cost per ton of breeze
 param n0_credit_tar default 20;           # Selling cost per ton of tar
 param n0_capex default 40;                # CAPEX of cokeoven per tCS rpoduction
-
 param n1_cost_breeze default 85;          # Cost per ton of breeze                         
 param n1_capex default 30;                # CAPEX of sinter plant per tCS production
-
 param n2_capex default 80;               # CAPEX of blast furnace per tCS production
-
-param n3_capex default 40;                # CAPEX of BOF per tCS production        
-                        
+param n3_capex default 40;                # CAPEX of BOF per tCS production                              
 param n4_capex_coal default 110;          # CAPEX of Coal-DRI per tCS production
-
 param n5_capex_ng := 90;                  # CAPEX of NG-DRI per tCS production
 param n5_cost_NG {t in T} default 10;     # Cost of natural gas per MMBtu
-
-# The former all-in delivered H2 price (ng_cost_h2_start/end -> ng_cost_h2) has been
-# REMOVED: hydrogen capital is now explicit sunk electrolyser + renewable builds (see
-# the green-H2 block at the end of this file and v_capacity.mod) and only a residual
-# variable opex (h2_opex) remains in the price. The primary uncertainty axis is the
-# global tech-learning scalar theta_tech; h2_capex_mult composes on top.
-param ng_h2_start_year default 2040;
 param n6_capex_h2{t in T} :=
     if t <= 2025 then 120
     else 120+ (90-120) * (t-2025)/25;     # CAPEX of H2-DRI per tCS from 2025 to 2050
-
 param n7_capex default 70;                # CAPEX of EAF plant (DRI based) per tCS
 param n7_cost_electrode default 600;      # Cost per ton of electrode
-
 param n8_capex default 70;                # CAPEX of EAF plant (Scrap-based) per tCS     
 param n8_cost_electrode default 600;      # Cost per ton of electrode
-   
 param n9_whr_capex default 0.009;         # CAPEX of WHR system per kWh of power generated
 param n9_whr_opex default 0.003;          # OPEX of WHR system per kWh of power generated
-
-# ALL-IN 2025 CCS anchor price ($/tCO2), INCLUSIVE of capex, O&M, energy
-# (electricity + steam), solvent, and transport & storage. Used only to
-# CALIBRATE the 2025 overnight capex (backed out by netting the other
-# components at fixed reference prices). The 2050 CCS cost is NOT anchored --
-# it emerges from the theta_ccs capex-learning path + energy prices (see the
-# POWER-TRANSITION block). n10_ccs_cost_end is DEPRECATED and unused; it stays
-# declared only so legacy CCSVAL driver tokens (`let n10_ccs_cost_end := X;`)
-# do not error.
+# CCS anchor price ($/tCO2), INCLUSIVE of capex, O&M, energy
+# (electricity + steam), solvent, and transport & storage. 
 param n10_ccs_cost_start default 125;
-param n10_ccs_cost_end default 75;   # DEPRECATED (no effect); CCS 2050 axis = theta_ccs
-
+param n10_ccs_cost_end default 75;   # CCS 2050 axis = theta_ccs
 param carbon_tax default 0; 
 param labor_cost default 20;              # Labor cost per tCS
 param maintenance_cost default 15;        # Maintenance cost per tCS
 param other_opex default 10;              # Other opex per tCS
 
 # OTHER PARAMETERS
-param real_discount_rate := 0.06;
-param n8_scrap_rate default 0.06;
-param n8_scrap_limit{t in T};
-param n5_ng_cap {T};
+
+
+
 # Coking-coal availability ceiling (imported coke-making coal for BF; PCI and indigenous
 # thermal DRI coal are NOT capped). Default 1e12 = effectively no limit, so runs without a
 # coking scenario file behave as before; scarce/normal/abundant set via scenarios/ccoal_*.
