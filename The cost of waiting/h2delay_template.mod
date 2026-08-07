@@ -1,17 +1,3 @@
-# ============================================================================
-# H2-DELAY x RAMP x EMISSION-CAP sweep template (mip-v3).
-# Question: across three build-rate regimes (Low/Medium/High: conventional-route
-# ramp 10/15/20 Mt-steel/yr with H2 electrolyser peaks 1.0/1.5/2.0 Mt-H2/yr),
-# how do the emission cap (avg_emi 1.6/1.8/2.0) and the H2 start year
-# (2030/35/40/45) shape 2050 H2-DRI capacity, 2050 CCS, and the levelized cost
-# of production (LCOP)?
-# The driver h2_delay.bat substitutes RAMPLABEL / RAMPVAL / H2REFVAL / EFVAL /
-# H2YRVAL and runs one instance per combination (36 total);
-# h2delayresult.mod appends one CSV line to Plots/H2_Delay/results/.
-# Backdrop: whatever parameters.mod says (central thetas 0.5, 6% scrap growth).
-# NOTE: token lets come AFTER include parameters.mod (it re-lets
-# ng_h2_start_year etc.; same ordering pattern as the other sweep templates).
-# ============================================================================
 reset;
 set T ordered := 2025..2050;
 
@@ -19,13 +5,12 @@ include definitions.mod;
 include variables.mod;
 include parameters.mod;
 
-# --- sweep tokens (substituted by h2_delay.bat) ---
+# sweep tokens 
 let cap_add_common   := RAMPVAL;    # common route build slab, t-steel/yr
 let h2_ref_cap       := H2REFVAL;   # H2 envelope scale, t-H2/yr (peak = 0.25x)
 let avg_emi          := EFVAL;      # cumulative-average emission cap, tCO2/tCS
 let ng_h2_start_year := H2YRVAL;    # green-H2 debut year
 
-# Re-derive downstream couplings:
 let h2_peak_year := ng_h2_start_year + 5;   # Gaussian buildout crest follows debut
 
 include modules/a_coke.mod;
@@ -61,11 +46,6 @@ option gurobi_options 'Threads=10 TimeLimit=300 mipgap=0.002';
 
 solve;
 
-# --- Post-solve: 2050 emission reduction attributable to H2 (average-
-# displacement convention, same-run): red_h2 = H2 steel x (gross intensity of
-# the run's NON-H2 production mix - the H2 route's own gross intensity).
-# GROSS (pre-capture) intensities keep this additive with red_ccs = captured
-# CO2, so D = red_h2/(red_h2+red_ccs) partitions the abatement cleanly.
 param e_h2_2050;      # H2 route gross emissions in 2050 (scope1 + its scope2 share)
 param red_h2_2050;    # tCO2 avoided by H2-DRI in 2050
 let e_h2_2050 :=
@@ -81,14 +61,6 @@ let red_h2_2050 :=
          - e_h2_2050
     else 0;
 
-# --- Machine-readable summary line (INLINE, not an include: the RAMPLABEL
-# token below must be substituted by the driver, which only rewrites this
-# template). Appended to Plots/H2_Delay/results/h2delay_summary.csv (header
-# written by h2_delay.bat). Columns: avg_emi, ramp_label, cap_add_common,
-# h2_ref_cap, h2_start, solve_result, h2dri_cap_2050 (t crude steel/yr),
-# ccs_2050 (tCO2 captured = red_ccs), lcop (PV cost / PV steel, $/tCS),
-# red_h2_2050 (tCO2 avoided by H2). On infeasible runs the numeric columns
-# are the solver's last iterate -- h2delay_pivot.py replaces them with 'X'.
 printf "%.2f,%s,%.0f,%.0f,%d,%s,%.0f,%.0f,%.2f,%.0f\n",
     avg_emi,
     "RAMPLABEL",
@@ -106,5 +78,4 @@ printf "%.2f,%s,%.0f,%.0f,%d,%s,%.0f,%.0f,%.2f,%.0f\n",
 printf "H2DELAYRESULT EF=%.2f ramp=%s h2start=%d -> %s\n",
     avg_emi, "RAMPLABEL", ng_h2_start_year, solve_result;
 
-# Full human report (last-iterate garbage on infeasible runs).
 include yreport.mod;
