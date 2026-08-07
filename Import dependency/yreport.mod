@@ -1,9 +1,3 @@
-# ------------------------------------------------------------------
-# Post-solve recovery of the DRI route fractions.
-# f_cdri / f_ngdri are no longer optimization variables (linearization: the route
-# *outputs* are the decisions). They are reconstructed here from the solved route
-# outputs purely for reporting:  f_route = route_output / dri_eaf_steel_out.
-# ------------------------------------------------------------------
 param f_cdri{t in T} default 0;
 param f_ngdri{t in T} default 0;
 let {t in T} f_cdri[t]  := if dri_eaf_steel_out[t] > 1e-6 then coaldri_output[t]/dri_eaf_steel_out[t] else 0;
@@ -29,14 +23,6 @@ printf "\nCO2 CAPTURED PER TON STEEL OVERALL (2025â€“2050): %.3f\n",
          / ( sum{t in T} total_steel[t] )
        else 0;
 
-# mip-v3 power-transition scenario: the derived H2 / CCS cost paths that EMERGE
-# from theta_tech (electrolyser/RE capex -> LCOH) and theta_grid (grid tariff +
-# EF -> CCS opex, Scope 2). LCOH = full levelized green-H2 cost (electrolyser +
-# firming + dedicated RE + opex); CCS all-in equivalent at the reference BF
-# stream (steam at the reference price).
-# LCOH component breakdown (Jindal et al. 2024 bands: electricity 40-60%,
-# electrolyser 30-40%). Firming/storage = delivered-firm-power cost, classified
-# under electricity together with the RE capital.
 printf "\nLCOH BREAKDOWN ($/kg and share; electricity = RE + firming)\n";
 printf "%-6s %-10s %-10s %-10s %-10s %-8s   %-12s %-12s\n",
        "YEAR", "Electrolyz", "RE", "Firming", "Other", "LCOH", "elec share", "elz share";
@@ -72,29 +58,19 @@ for {t in T: t = 2025 or t = 2030 or t = 2035 or t = 2040 or t = 2045 or t = 205
 }
        
 printf "\n%-20s %-20s\n", "Route", "Fraction";
-
 printf "%-20s %10.4f\n", "BF-BOF", f_bof[2050];
-
 printf "%-20s %10.4f\n", "Coal DRI-EAF", f_cdri[2050] * f_eaf[2050];
-
 printf "%-20s %10.4f\n", "NG DRI-EAF", f_ngdri[2050] * f_eaf[2050];
-
 printf "%-20s %10.4f\n", "H2 DRI-EAF", 
     (1 - f_cdri[2050] - f_ngdri[2050]) * f_eaf[2050];
-
 printf "%-20s %10.4f\n", "Scrap-EAF", 
     1 - f_bof[2050] 
       - f_cdri[2050] * f_eaf[2050] 
       - f_ngdri[2050] * f_eaf[2050] 
       - (1 - f_cdri[2050] - f_ngdri[2050]) * f_eaf[2050];
-
 printf "\nTOTAL H2 USED IN H2-DRI (2025â€“2050): %.3f million units\n",
        ( sum{t in T} steel_eaf[t] * (1 - f_cdri[t] - f_ngdri[t]) ) / 1e6;
 printf "\n";
-
-# mip-v3: realized scrap-blend shares (blended-scrap flow / metallic charge,
-# an OUTCOME of the yearly flow decisions, banded by [phi_min, phi_max] and
-# smoothed by blend_ramp) + the scrap-allocation picture vs availability.
 printf "\nSCRAP ALLOCATION (blend shares = scrap / metallic charge; flows in t)\n";
 printf "%-6s %-8s %-8s %-8s %-8s   %-12s %-12s %-12s\n",
        "YEAR", "BOF", "CoalDRI", "NGDRI", "H2DRI", "Scrap-EAF t", "Total scrap", "Limit";
@@ -110,7 +86,6 @@ for {t in T} {
         n8_scrap_limit[t];
 }
 printf "\n";
-
 printf "\n%-6s %-20s %-37s %-18s %-10s",
        "YEAR",
        "BF-BOF (t/f)",
@@ -133,10 +108,6 @@ for {t in T} {
 }
 
 printf "\n";
-
-# TABLE 2: CCS fractions and captured amounts
-
-
 printf "\n%-6s %-20s %-20s %-20s %-15s %-12s",
        "YEAR",
        "BF-BOF CCS (t/f)",
@@ -174,7 +145,6 @@ for {t in T} {
 
 
 printf "\n";
-
 printf "\nTOTAL FRACTION OF CO2 CAPTURED (2025â€“2050): %.3f\n",
        if (sum{t in T} total_emissions[t]) > 0 then
            ( sum{t in T} total_ccs[t] )
@@ -183,7 +153,6 @@ printf "\nTOTAL FRACTION OF CO2 CAPTURED (2025â€“2050): %.3f\n",
 
 
 printf "\n";
-
 printf "\nTOTAL FRACTION OF DIRECT CO2 CAPTURED (2025â€“2050): %.3f\n",
        if (sum{t in T} scope1_emissions[t]) > 0 then
            ( sum{t in T} total_ccs[t] )
@@ -192,7 +161,6 @@ printf "\nTOTAL FRACTION OF DIRECT CO2 CAPTURED (2025â€“2050): %.3f\n",
 
 
 printf "\n";
-
 printf "\n%-6s %-25s %-25s",
        "YEAR",
        "Avg Emissions (tCO2/ton)",
@@ -210,8 +178,6 @@ for {t in T} {
 }
 
 printf "\n";
-
-
 printf "\nAVG (NON-LEVELIZED) STEEL PRODUCTION COST (2025â€“2050): %.2f $/ton\n",
        if sum{t in T} total_steel[t] > 0 then
            ( sum{t in T} total_cost[t] )
@@ -219,11 +185,6 @@ printf "\nAVG (NON-LEVELIZED) STEEL PRODUCTION COST (2025â€“2050): %.2f $/t
        else 0;
 
 printf "\n";
-
-
-
-
-
 
 # route costs per year
 
@@ -239,12 +200,6 @@ for {t in T} {
     printf "\n%4d %12.2f %15.2f %15.2f %15.2f %15.2f",
         t,
 
-        # BF-BOF  (levelized $/t). Capital is annualized capex on BUILT capacity
-        # only -- acapex*(cap-legacy) -- so the free 2025 incumbent fleet is NOT
-        # billed, matching the objective (which charges overnight capex on builds,
-        # never on legacy); the CRF=annuity identity makes the two reconcile in
-        # present value. Fixed O&M on full capacity, variable opex on production;
-        # capex-free cost_* vars; stream-specific CCS.
         if steel_bof[t] > 0 then
            ( acapex_bof*(cap_bof[t]-legacy_bof[t]) + fopex_bof*cap_bof[t]
            + cost_cokeov[t] + cost_sinter[t] + cost_pellet_bf[t] + cost_bf[t] + cost_bof[t]
@@ -280,9 +235,6 @@ for {t in T} {
            / (steel_eaf[t]*f_ngdri[t])
         else 0,
 
-        # H2 DRI-EAF  (no CCS stream). Includes the green-H2 SUPPLY capital
-        # (electrolyser + dedicated renewable, annualized capex + fixed O&M) allocated
-        # to this route by its share of total H2 use (DRI vs BF injection).
         if t >= ng_h2_start_year && steel_eaf[t]*(1-f_cdri[t]-f_ngdri[t]) > 0 then
            ( acapex_h2dri[t]*(cap_h2dri[t]-legacy_h2dri[t]) + fopex_h2dri*cap_h2dri[t]
            + ( (acapex_h2elec[t]+fopex_h2elec)*cap_h2elec[t] + (acapex_h2re[t]+fopex_h2re)*cap_h2re[t] )
@@ -305,10 +257,7 @@ for {t in T} {
         else 0;
 }
 
-
 # route emissions per year
-
-
 printf "\n%-6s %-12s %-15s %-15s %-15s %-15s",
        "YEAR",
        "BF-BOF (tCO2/t)",
@@ -322,7 +271,7 @@ for {t in T} {
     printf "\n%4d %12.3f %15.3f %15.3f %15.3f %15.3f",
         t,
 
-        # ------------------ BF-BOF ------------------
+        # BF-BOF
         if steel_bof[t] > 0 then
             (scope1_bf[t] 
              + n9_grid_ef[t] * max(coke_power_in[t] + sinter_power_in[t] + bf_power_in[t]
@@ -332,7 +281,7 @@ for {t in T} {
             / steel_bof[t]
         else 0,
 
-        # ------------------ Coal DRI-EAF ------------------
+        # Coal DRI-EAF 
         if steel_eaf[t]*f_cdri[t] > 0 then
             (scope1_cdri[t]
              + n9_grid_ef[t] * (coaldri_power_in[t] + f_cdri[t]*eaf_power_in[t] + pellets_power_coaldri[t])
@@ -340,7 +289,7 @@ for {t in T} {
             / (steel_eaf[t]*f_cdri[t])
         else 0,
 
-        # ------------------ NG DRI-EAF ------------------
+        # NG DRI-EAF
         if steel_eaf[t]*f_ngdri[t] > 0 then
             (scope1_ngdri[t]
              + n9_grid_ef[t] * (ngdri_power_in[t] + f_ngdri[t]*eaf_power_in[t] + pellets_power_ngdri[t])
@@ -348,14 +297,14 @@ for {t in T} {
             / (steel_eaf[t]*f_ngdri[t])
         else 0,
 
-        # ------------------ H2 DRI-EAF ------------------
+        # H2 DRI-EAF 
         if t >= ng_h2_start_year && steel_eaf[t]*(1-f_cdri[t]-f_ngdri[t]) > 0 then
             (( eaf_coal_in[t] * (1- f_cdri[t]-f_ngdri[t]) * 0.110*24+ eaf_lime_in[t] * (1- f_cdri[t]-f_ngdri[t]) * 0.44 + eaf_electrode_in[t] *  (1- f_cdri[t]-f_ngdri[t]) * 6)
              + n9_grid_ef[t] * ((1-f_cdri[t]-f_ngdri[t])*eaf_power_in[t] + pellets_power_h2dri[t] + h2dri_power_in[t]))
             / (steel_eaf[t]*(1-f_cdri[t]-f_ngdri[t]))
         else 0,
 
-        # ------------------ Scrap-EAF ------------------
+        # Scrap-EAF
         if steel_scrap_eaf[t] > 0 then
             (scope1_scrapeaf[t]
              + n9_grid_ef[t] * scrap_eaf_power_in[t])
@@ -364,6 +313,4 @@ for {t in T} {
 }
 
 printf "\n";
-
 printf "\n";
-       
