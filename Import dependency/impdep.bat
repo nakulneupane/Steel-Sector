@@ -1,16 +1,6 @@
 @echo off
 setlocal EnableDelayedExpansion
 
-rem ============================================================================
-rem IMPORT-DEPENDENCE sweep: 4 regimes {coking-coal imports Lo/Hi x NG imports
-rem Lo/Hi, from the calibrated scarce/abundant availability scenarios} x
-rem 4 H2 start years (2030-2045) = 16 runs, cap fixed at 1.8. Prices fixed --
-rem pure quantity-dependence. Import bill = coking coal (100%% imported) + NG
-rem above the flat domestic supply (50%% of the 2025 cap). Model copy in THIS
-rem folder. Outputs: per-run logs + impdep_summary.csv in results\, then
-rem impdep_pivot.py builds the workbook and impdep_plot.py the figures.
-rem ============================================================================
-
 set "AMPL_EXE=C:\Users\Other User\AMPL\ampl.exe"
 set "WORKDIR=C:\Users\Other User\Desktop\Claude\steel-mip\Plots\Import dependence"
 
