@@ -1,33 +1,4 @@
-# ============================================================================
-# IMPORT-DEPENDENCE sweep template.
-# Question: how does the decarbonisation pathway change across four import
-# regimes -- {coking-coal imports scarce/abundant} x {NG imports scarce/
-# abundant} -- crossed with the H2 start year, under a fixed cap of 1.8?
-# Regimes use availability scenarios RE-ANCHORED to the model's calibrated
-# 2025 coking-coal requirement (~60.5 Mt = 77.6 Mt BF steel x 0.779 t/tCS);
-# prices FIXED, so this is a pure quantity-dependence story. Import
-# dependence itself is an OUTCOME, measured post-solve:
-#   - coking coal: India imports ~90% of its requirement. Regimes are
-#     HISTORY-CALIBRATED: domestic blendable supply grows +7.5%/yr in BOTH
-#     regimes (FY18-FY25 raw production 40.2 -> 66.5 Mt, applied to the ~6 Mt
-#     washed-blendable model basis); imports grow +6.4%/yr (2007-08 -> 2022-23
-#     steel-sector trend, 22 -> 56 Mt) in ABUNDANT and are FROZEN at 54.5 Mt
-#     in SCARCE (import stagnation, precedent 2019-21).
-#     Imports_t = max(0, coking coal used_t - domestic_t).
-#   - NG: regimes are the user's national scenarios (10% steel allocation):
-#     LoNG = BAU (supply only doubles, to 10.7 Mt, while steel demand grows
-#     3.4x); HiNG = POLICY (government targets, ~6x to 32.2 Mt). The central
-#     Shock case used elsewhere lies between them. Domestic supply to steel
-#     is FLAT at 50% of the 2025 cap
-#     (ng_domestic ~ 2.674 Mt/yr -- Indian domestic production is roughly
-#     flat; growth is LNG). Imports_t = max(0, NG used_t - ng_domestic).
-#   - PCI coal and scrap imports deliberately EXCLUDED from the bill.
-#
-# SELF-CONTAINED: model copy in THIS folder. impdep.bat substitutes REGLABEL,
-# IMPCCOALFILE / IMPNGFILE (scenario includes) and H2YRVAL. Fixed backdrop:
-#   avg_emi 1.8, all thetas 0.5, MEDIUM ramp (15 Mt / 6 Mt H2 ref),
-#   scrap growth 6%, NG 10 $/MMBtu, coking coal $184/t.
-# ============================================================================
+
 reset;
 set T ordered := 2025..2050;
 
@@ -35,7 +6,6 @@ include definitions.mod;
 include variables.mod;
 include parameters.mod;
 
-# --- fixed study backdrop ---
 let theta_tech := 0.5;
 let theta_grid := 0.5;
 let theta_ccs  := 0.5;
@@ -47,10 +17,10 @@ let {t in T: ord(t) > 1}
     n8_scrap_limit[t] := n8_scrap_limit[prev(t)] * (1 + n8_scrap_rate);
 let {t in T} n5_cost_NG[t] := 10;
 
-# --- sweep tokens (substituted by impdep.bat) ---
+# sweep
 let ng_h2_start_year := H2YRVAL;
 let h2_peak_year     := ng_h2_start_year + 5;
-# import-regime availability profiles (override the parameters.mod defaults)
+
 include IMPCCOALFILE;
 include IMPNGFILE;
 
@@ -84,19 +54,10 @@ minimize obj:
 
 option solver gurobi;
 option gurobi_options 'Threads=10 TimeLimit=300 mipgap=0.002';
-
-# STUDY CHOICE: the year-on-year intensity-monotonicity constraint is DROPPED
-# here (the cumulative avg_emi cap stays). Under coking-coal scarcity the
-# least-cost -- indeed the only feasible -- pathway substitutes toward dirtier
-# indigenous coal-DRI, i.e. a TEMPORARY intensity bump before decarbonising;
-# with monotonicity enforced every LoCoal cell is infeasible and the study
-# degenerates. (Worth one line in the paper: import scarcity of coking coal
-# CONFLICTS with monotone decarbonisation.)
 drop emission_monotonic;
 
 solve;
 
-# --- post-solve import accounting (undiscounted cumulative, 2025-2050) ---
 param ng_domestic    := 0.5 * 5348550;  # flat domestic NG to steel, t/yr (50% of 2025 cap)
 param ccoal_domestic{t in T} := 6000000 * 1.075^(t-2025);  # domestic coking coal, +7.5%/yr (FY18-25 CAGR)
 param cum_ccoal_bill; param cum_ng_import; param cum_ng_bill;
@@ -104,7 +65,7 @@ let cum_ccoal_bill := sum{t in T} max(0, coking_coal_in[t] - ccoal_domestic[t]) 
 let cum_ng_import  := sum{t in T} max(0, ngdri_ng_in[t] - ng_domestic);
 let cum_ng_bill    := sum{t in T} max(0, ngdri_ng_in[t] - ng_domestic) * n5_cost_NG[t]*50;
 
-# --- H2 emission reduction in 2050 (same convention as the other studies) ---
+# H2 emission reduction in 2050 
 param e_h2_2050; param red_h2_2050;
 let e_h2_2050 :=
     scope1_h2dri[2050]
